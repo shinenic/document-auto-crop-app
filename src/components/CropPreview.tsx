@@ -11,6 +11,10 @@ export default function CropPreview() {
     (img) => img.id === state.selectedImageId,
   );
 
+  const isBinarized =
+    (selectedImage?.editState?.filterConfig?.type ?? "none") !== "none" &&
+    !!selectedImage?.filteredCanvas;
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -49,7 +53,9 @@ export default function CropPreview() {
     const rotated = rotateCanvas(sourceCanvas, rotation);
     canvas.width = rotated.width;
     canvas.height = rotated.height;
-    canvas.getContext("2d")!.drawImage(rotated, 0, 0);
+    const ctx = canvas.getContext("2d")!;
+    ctx.imageSmoothingEnabled = filterType === "none";
+    ctx.drawImage(rotated, 0, 0);
   }, [
     selectedImage?.cropCanvas,
     selectedImage?.filteredCanvas,
@@ -75,6 +81,7 @@ export default function CropPreview() {
       <canvas
         ref={canvasRef}
         className="max-w-full max-h-full object-contain"
+        style={isBinarized ? { imageRendering: "pixelated" } : undefined}
       />
     </div>
   );
