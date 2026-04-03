@@ -13,6 +13,7 @@ import type {
   ImageEntry,
   QuadResult,
 } from "../lib/types";
+import { DEFAULT_FILTER_CONFIG } from "../lib/types";
 
 // ─── Actions ────────────────────────────────────────────────────────────────
 
@@ -42,6 +43,10 @@ function cloneEditState(s: EditState): EditState {
       isArc: f.isArc,
     })),
     rotation: s.rotation,
+    filterConfig: {
+      type: s.filterConfig.type,
+      binarize: { ...s.filterConfig.binarize },
+    },
   };
 }
 
@@ -54,6 +59,10 @@ export function editStateFromQuad(quad: QuadResult): EditState {
       isArc: f.isArc,
     })),
     rotation: 0,
+    filterConfig: {
+      type: DEFAULT_FILTER_CONFIG.type,
+      binarize: { ...DEFAULT_FILTER_CONFIG.binarize },
+    },
   };
 }
 
@@ -171,6 +180,7 @@ function reducer(state: AppState, action: AppAction): AppState {
             ...img,
             editState: null,
             cropCanvas: null,
+            filteredCanvas: null,
             history: { past, future: [] },
           };
         }),

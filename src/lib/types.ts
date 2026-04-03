@@ -19,12 +19,37 @@ export interface InferenceResult {
   height: number;
 }
 
+// --- Filter Config ---
+
+export interface BinarizeConfig {
+  blockRadiusBps: number;   // basis points; actual radius = sqrt(W*H*bps/10000)
+  contrastOffset: number;   // bias added to local mean (negative = favor white)
+  upsamplingScale: number;  // percentage (200 = 2x upscale before threshold)
+}
+
+export interface FilterConfig {
+  type: "none" | "binarize";
+  binarize: BinarizeConfig;  // always present so settings persist when toggling
+}
+
+export const DEFAULT_BINARIZE_CONFIG: BinarizeConfig = {
+  blockRadiusBps: 300,
+  contrastOffset: -25,
+  upsamplingScale: 200,
+};
+
+export const DEFAULT_FILTER_CONFIG: FilterConfig = {
+  type: "none",
+  binarize: { ...DEFAULT_BINARIZE_CONFIG },
+};
+
 // --- Editor State ---
 
 export interface EditState {
   corners: [number, number][];
   edgeFits: EdgeFit[];
   rotation: 0 | 90 | 180 | 270;
+  filterConfig: FilterConfig;
 }
 
 export interface ImageHistory {
@@ -48,6 +73,7 @@ export interface ImageEntry {
   editState: EditState | null; // null = crop cancelled
   history: ImageHistory;
   cropCanvas: HTMLCanvasElement | null;
+  filteredCanvas: HTMLCanvasElement | null;
   status: ImageStatus;
   error?: string;
 }
