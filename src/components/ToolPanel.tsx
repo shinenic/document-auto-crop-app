@@ -1,0 +1,225 @@
+"use client";
+
+import { useCallback } from "react";
+import { useApp } from "../context/AppContext";
+import { EDGE_LABELS } from "../lib/types";
+
+function ToolButton({
+  label,
+  onClick,
+  disabled = false,
+  variant = "default",
+}: {
+  label: string;
+  onClick: () => void;
+  disabled?: boolean;
+  variant?: "default" | "danger" | "accent";
+}) {
+  const colors = {
+    default:
+      "bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)]",
+    danger:
+      "bg-[var(--bg-tertiary)] text-[var(--danger)] hover:bg-red-950/30",
+    accent:
+      "bg-[var(--accent-muted)] text-[var(--accent)] hover:bg-[var(--accent)]/20",
+  };
+
+  return (
+    <button
+      className={`w-full px-3 py-2 text-xs font-medium rounded-lg transition-colors disabled:opacity-30 disabled:pointer-events-none ${colors[variant]}`}
+      onClick={onClick}
+      disabled={disabled}
+    >
+      {label}
+    </button>
+  );
+}
+
+export default function ToolPanel() {
+  const { state, dispatch } = useApp();
+  const selectedImage = state.images.find(
+    (img) => img.id === state.selectedImageId,
+  );
+
+  const canUndo = (selectedImage?.history.past.length ?? 0) > 0;
+  const canRedo = (selectedImage?.history.future.length ?? 0) > 0;
+  const hasCrop = selectedImage?.editState != null;
+  const id = selectedImage?.id;
+
+  const undo = useCallback(() => {
+    if (id) dispatch({ type: "UNDO", id });
+  }, [id, dispatch]);
+
+  const redo = useCallback(() => {
+    if (id) dispatch({ type: "REDO", id });
+  }, [id, dispatch]);
+
+  const rotateCW = useCallback(() => {
+    if (!id || !selectedImage?.editState) return;
+    dispatch({ type: "PUSH_HISTORY", id });
+    const r = selectedImage.editState.rotation;
+    dispatch({
+      type: "SET_EDIT_STATE",
+      id,
+      editState: { ...selectedImage.editState, rotation: ((r + 90) % 360) as 0 | 90 | 180 | 270 },
+    });
+  }, [id, selectedImage, dispatch]);
+
+  const rotateCCW = useCallback(() => {
+    if (!id || !selectedImage?.editState) return;
+    dispatch({ type: "PUSH_HISTORY", id });
+    const r = selectedImage.editState.rotation;
+    dispatch({
+      type: "SET_EDIT_STATE",
+      id,
+      editState: { ...selectedImage.editState, rotation: ((r + 270) % 360) as 0 | 90 | 180 | 270 },
+    });
+  }, [id, selectedImage, dispatch]);
+
+  const resetToPrediction = useCallback(() => {
+    if (id) dispatch({ type: "RESET_TO_PREDICTION", id });
+  }, [id, dispatch]);
+
+  const cancelCrop = useCallback(() => {
+    if (id) dispatch({ type: "CANCEL_CROP", id });
+  }, [id, dispatch]);
+
+  const toggleEdge = useCallback(
+    (edgeIdx: number) => {
+      if (!id || !selectedImage?.editState) return;
+      dispatch({ type: "PUSH_HISTORY", id });
+
+      const edgeFits = selectedImage.editState.edgeFits.map((f) => ({
+        cp1: [...f.cp1] as [number, number],
+        cp2: [...f.cp2] as [number, number],
+        isArc: f.isArc,
+      }));
+      const corners = selectedImage.editState.corners;
+      const s = corners[edgeIdx];
+      const e = corners[(edgeIdx + 1) % 4];
+
+      if (edgeFits[edgeIdx].isArc) {
+        edgeFits[edgeIdx].cp1 = [s[0] + (e[0] - s[0]) / 3, s[1] + (e[1] - s[1]) / 3];
+        edgeFits[edgeIdx].cp2 = [s[0] + (2 * (e[0] - s[0])) / 3, s[1] + (2 * (e[1] - s[1])) / 3];
+        edgeFits[edgeIdx].isArc = false;
+      } else {
+        const dx = e[0] - s[0], dy = e[1] - s[1];
+        const len = Math.hypot(dx, dy);
+        const nx = (-dy / len) * len * 0.1, ny = (dx / len) * len * 0.1;
+        edgeFits[edgeIdx].cp1 = [s[0] + dx / 3 + nx, s[1] + dy / 3 + ny];
+        edgeFits[edgeIdx].cp2 = [s[0] + (2 * dx) / 3 + nx, s[1] + (2 * dy) / 3 + ny];
+        edgeFits[edgeIdx].isArc = true;
+      }
+
+      dispatch({
+        type: "SET_EDIT_STATE",
+        id,
+        editState: { ...selectedImage.editState, edgeFits },
+      });
+    },
+    [id, selectedImage, dispatch],
+  );
+
+  const removeEdgeCurve = useCallback(
+    (edgeIdx: number) => {
+      if (!id || !selectedImage?.editState) return;
+      if (!selectedImage.editState.edgeFits[edgeIdx].isArc) return;
+
+      dispatch({ type: "PUSH_HISTORY", id });
+      const edgeFits = selectedImage.editState.edgeFits.map((f) => ({
+        cp1: [...f.cp1] as [number, number],
+        cp2: [...f.cp2] as [number, number],
+        isArc: f.isArc,
+      }));
+      const corners = selectedImage.editState.corners;
+      const s = corners[edgeIdx];
+      const e = corners[(edgeIdx + 1) % 4];
+      edgeFits[edgeIdx].cp1 = [s[0] + (e[0] - s[0]) / 3, s[1] + (e[1] - s[1]) / 3];
+      edgeFits[edgeIdx].cp2 = [s[0] + (2 * (e[0] - s[0])) / 3, s[1] + (2 * (e[1] - s[1])) / 3];
+      edgeFits[edgeIdx].isArc = false;
+
+      dispatch({
+        type: "SET_EDIT_STATE",
+        id,
+        editState: { ...selectedImage.editState, edgeFits },
+      });
+    },
+    [id, selectedImage, dispatch],
+  );
+
+  if (!selectedImage || selectedImage.status !== "ready") {
+    return (
+      <div className="w-44 flex-shrink-0 bg-[var(--bg-secondary)] border-l border-[var(--border)] p-3">
+        <p className="text-xs text-[var(--text-muted)]">No image selected</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="w-44 flex-shrink-0 bg-[var(--bg-secondary)] border-l border-[var(--border)] p-3 flex flex-col gap-4 overflow-y-auto">
+      {/* History */}
+      <div>
+        <h4 className="text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-2">History</h4>
+        <div className="flex flex-col gap-1">
+          <ToolButton label="Undo (Ctrl+Z)" onClick={undo} disabled={!canUndo} />
+          <ToolButton label="Redo (Ctrl+Shift+Z)" onClick={redo} disabled={!canRedo} />
+        </div>
+      </div>
+
+      {/* Rotation */}
+      <div>
+        <h4 className="text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-2">Rotation</h4>
+        <div className="flex flex-col gap-1">
+          <ToolButton label="Rotate 90\u00b0 CW (R)" onClick={rotateCW} disabled={!hasCrop} />
+          <ToolButton label="Rotate 90\u00b0 CCW (Shift+R)" onClick={rotateCCW} disabled={!hasCrop} />
+        </div>
+      </div>
+
+      {/* Reset */}
+      <div>
+        <h4 className="text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-2">Reset</h4>
+        <div className="flex flex-col gap-1">
+          <ToolButton label="Reset to Prediction" onClick={resetToPrediction} />
+          <ToolButton label="Cancel Crop" onClick={cancelCrop} variant="danger" />
+        </div>
+      </div>
+
+      {/* Add Bezier CPs */}
+      <div>
+        <h4 className="text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-2">Add Bezier CPs</h4>
+        <div className="flex flex-col gap-1">
+          {EDGE_LABELS.map((label, i) => {
+            const arc = selectedImage?.editState?.edgeFits[i]?.isArc ?? false;
+            return (
+              <ToolButton
+                key={i}
+                label={`${label}: ${arc ? "Curve" : "Line"}`}
+                onClick={() => toggleEdge(i)}
+                disabled={!hasCrop}
+                variant={arc ? "accent" : "default"}
+              />
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Remove Bezier CPs */}
+      <div>
+        <h4 className="text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-2">Remove Bezier CPs</h4>
+        <div className="flex flex-col gap-1">
+          {EDGE_LABELS.map((label, i) => {
+            const arc = selectedImage?.editState?.edgeFits[i]?.isArc ?? false;
+            return (
+              <ToolButton
+                key={i}
+                label={label}
+                onClick={() => removeEdgeCurve(i)}
+                disabled={!hasCrop || !arc}
+              />
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
