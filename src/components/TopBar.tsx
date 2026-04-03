@@ -29,8 +29,14 @@ export default function TopBar() {
     );
     if (!selectedImage?.cropCanvas) return;
 
+    const filterType = selectedImage.editState?.filterConfig?.type ?? "none";
+    const sourceCanvas =
+      filterType !== "none" && selectedImage.filteredCanvas
+        ? selectedImage.filteredCanvas
+        : selectedImage.cropCanvas;
+
     const rotation = selectedImage.editState?.rotation ?? 0;
-    const final = rotateCanvas(selectedImage.cropCanvas, rotation);
+    const final = rotateCanvas(sourceCanvas, rotation);
 
     final.toBlob((blob) => {
       if (!blob) return;
@@ -50,8 +56,15 @@ export default function TopBar() {
 
       for (const img of state.images) {
         if (!img.cropCanvas) continue;
+
+        const filterType = img.editState?.filterConfig?.type ?? "none";
+        const sourceCanvas =
+          filterType !== "none" && img.filteredCanvas
+            ? img.filteredCanvas
+            : img.cropCanvas;
+
         const rotation = img.editState?.rotation ?? 0;
-        const final = rotateCanvas(img.cropCanvas, rotation);
+        const final = rotateCanvas(sourceCanvas, rotation);
 
         const blob = await new Promise<Blob | null>((resolve) => {
           final.toBlob((b) => resolve(b), "image/jpeg", 0.92);

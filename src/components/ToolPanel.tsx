@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useRef, useEffect } from "react";
 import { useApp } from "../context/AppContext";
-import { EDGE_LABELS } from "../lib/types";
+import { EDGE_LABELS, DEFAULT_FILTER_CONFIG } from "../lib/types";
+import type { FilterConfig, BinarizeConfig } from "../lib/types";
 
 function ToolButton({
   label,
@@ -32,6 +33,46 @@ function ToolButton({
     >
       {label}
     </button>
+  );
+}
+
+function Slider({
+  label,
+  value,
+  min,
+  max,
+  step,
+  disabled,
+  onChange,
+  onPointerDown,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+  disabled: boolean;
+  onChange: (v: number) => void;
+  onPointerDown: () => void;
+}) {
+  return (
+    <label className="flex flex-col gap-1">
+      <div className="flex justify-between text-[10px] text-[var(--text-muted)]">
+        <span>{label}</span>
+        <span className="font-mono">{value}</span>
+      </div>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        disabled={disabled}
+        className="w-full h-1 accent-[var(--accent)] disabled:opacity-30"
+        onPointerDown={onPointerDown}
+        onChange={(e) => onChange(Number(e.target.value))}
+      />
+    </label>
   );
 }
 
@@ -147,6 +188,66 @@ export default function ToolPanel() {
     [id, selectedImage, dispatch],
   );
 
+  const filterConfig = selectedImage?.editState?.filterConfig ?? DEFAULT_FILTER_CONFIG;
+  const isFilterActive = filterConfig.type === "binarize";
+
+  const setFilterType = useCallback(
+    (type: FilterConfig["type"]) => {
+      if (!id || !selectedImage?.editState) return;
+      dispatch({ type: "PUSH_HISTORY", id });
+      dispatch({
+        type: "SET_EDIT_STATE",
+        id,
+        editState: {
+          ...selectedImage.editState,
+          filterConfig: { ...selectedImage.editState.filterConfig, type },
+        },
+      });
+    },
+    [id, selectedImage, dispatch],
+  );
+
+  // Track whether we've already pushed history for the current slider drag
+  const sliderHistoryPushedRef = useRef(false);
+
+  const handleSliderPointerDown = useCallback(() => {
+    if (!id || !selectedImage?.editState) return;
+    if (!sliderHistoryPushedRef.current) {
+      dispatch({ type: "PUSH_HISTORY", id });
+      sliderHistoryPushedRef.current = true;
+    }
+  }, [id, selectedImage, dispatch]);
+
+  // Reset the flag when pointer is released anywhere
+  useEffect(() => {
+    const handlePointerUp = () => {
+      sliderHistoryPushedRef.current = false;
+    };
+    window.addEventListener("pointerup", handlePointerUp);
+    return () => window.removeEventListener("pointerup", handlePointerUp);
+  }, []);
+
+  const updateBinarizeConfig = useCallback(
+    (updates: Partial<BinarizeConfig>) => {
+      if (!id || !selectedImage?.editState) return;
+      dispatch({
+        type: "SET_EDIT_STATE",
+        id,
+        editState: {
+          ...selectedImage.editState,
+          filterConfig: {
+            ...selectedImage.editState.filterConfig,
+            binarize: {
+              ...selectedImage.editState.filterConfig.binarize,
+              ...updates,
+            },
+          },
+        },
+      });
+    },
+    [id, selectedImage, dispatch],
+  );
+
   if (!selectedImage || selectedImage.status !== "ready") {
     return (
       <div className="w-44 flex-shrink-0 bg-[var(--bg-secondary)] border-l border-[var(--border)] p-3">
@@ -173,6 +274,69 @@ export default function ToolPanel() {
           <ToolButton label="Rotate 90\u00b0 CW (R)" onClick={rotateCW} disabled={!hasCrop} />
           <ToolButton label="Rotate 90\u00b0 CCW (Shift+R)" onClick={rotateCCW} disabled={!hasCrop} />
         </div>
+      </div>
+
+      {/* Filter */}
+      <div>
+        <h4 className="text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-2">Filter</h4>
+        <div className="flex gap-1 mb-2">
+          <button
+            className={`flex-1 px-2 py-1.5 text-[10px] font-medium rounded-lg transition-colors ${
+              !isFilterActive
+                ? "bg-[var(--accent-muted)] text-[var(--accent)]"
+                : "bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)]"
+            } disabled:opacity-30 disabled:pointer-events-none`}
+            onClick={() => setFilterType("none")}
+            disabled={!hasCrop}
+          >
+            None
+          </button>
+          <button
+            className={`flex-1 px-2 py-1.5 text-[10px] font-medium rounded-lg transition-colors ${
+              isFilterActive
+                ? "bg-[var(--accent-muted)] text-[var(--accent)]"
+                : "bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)]"
+            } disabled:opacity-30 disabled:pointer-events-none`}
+            onClick={() => setFilterType("binarize")}
+            disabled={!hasCrop}
+          >
+            B&W
+          </button>
+        </div>
+        {isFilterActive && (
+          <div className="flex flex-col gap-2">
+            <Slider
+              label="Block Radius"
+              value={filterConfig.binarize.blockRadiusBps}
+              min={50}
+              max={1000}
+              step={10}
+              disabled={!hasCrop}
+              onPointerDown={handleSliderPointerDown}
+              onChange={(v) => updateBinarizeConfig({ blockRadiusBps: v })}
+            />
+            <Slider
+              label="Contrast"
+              value={filterConfig.binarize.contrastOffset}
+              min={-50}
+              max={10}
+              step={1}
+              disabled={!hasCrop}
+              onPointerDown={handleSliderPointerDown}
+              onChange={(v) => updateBinarizeConfig({ contrastOffset: v })}
+            />
+            <Slider
+              label="Upscale %"
+              value={filterConfig.binarize.upsamplingScale}
+              min={100}
+              max={400}
+              step={25}
+              disabled={!hasCrop}
+              onPointerDown={handleSliderPointerDown}
+              onChange={(v) => updateBinarizeConfig({ upsamplingScale: v })}
+            />
+          </div>
+        )}
       </div>
 
       {/* Reset */}

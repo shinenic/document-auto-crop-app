@@ -16,9 +16,15 @@ export default function CropPreview() {
     if (!canvas) return;
 
     const cropCanvas = selectedImage?.cropCanvas;
+    const filteredCanvas = selectedImage?.filteredCanvas;
+    const filterType = selectedImage?.editState?.filterConfig?.type ?? "none";
     const rotation = selectedImage?.editState?.rotation ?? 0;
 
-    if (!cropCanvas) {
+    // Choose source: filteredCanvas if filter is active AND result is ready
+    const sourceCanvas =
+      filterType !== "none" && filteredCanvas ? filteredCanvas : cropCanvas;
+
+    if (!sourceCanvas) {
       // Show original if no crop, or clear
       if (selectedImage?.originalCanvas) {
         const src = selectedImage.originalCanvas;
@@ -40,13 +46,15 @@ export default function CropPreview() {
       return;
     }
 
-    const rotated = rotateCanvas(cropCanvas, rotation);
+    const rotated = rotateCanvas(sourceCanvas, rotation);
     canvas.width = rotated.width;
     canvas.height = rotated.height;
     canvas.getContext("2d")!.drawImage(rotated, 0, 0);
   }, [
     selectedImage?.cropCanvas,
+    selectedImage?.filteredCanvas,
     selectedImage?.editState?.rotation,
+    selectedImage?.editState?.filterConfig?.type,
     selectedImage?.originalCanvas,
   ]);
 

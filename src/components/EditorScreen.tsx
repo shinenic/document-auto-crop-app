@@ -8,6 +8,7 @@ import CropPreview from "./CropPreview";
 import ToolPanel from "./ToolPanel";
 import { useApp } from "../context/AppContext";
 import { perspectiveCrop } from "../lib/crop";
+import { applyBinarize } from "../lib/binarize";
 import type { AppState } from "../lib/types";
 import { useKeyboardShortcuts } from "../hooks/useKeyboardShortcuts";
 
@@ -60,6 +61,58 @@ export default function EditorScreen() {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cropKey, state.selectedImageId]);
+
+  // Compute filteredCanvas when cropCanvas or filterConfig changes
+  const filterKey = selectedImage?.editState?.filterConfig
+    ? JSON.stringify(selectedImage.editState.filterConfig)
+    : null;
+
+  useEffect(() => {
+    if (!selectedImage?.cropCanvas || !selectedImage.editState) return;
+
+    const { filterConfig } = selectedImage.editState;
+    const imageId = selectedImage.id;
+    const cropCanvas = selectedImage.cropCanvas;
+
+    // If filter is none, clear filteredCanvas
+    if (filterConfig.type === "none") {
+      if (selectedImage.filteredCanvas) {
+        dispatch({
+          type: "UPDATE_IMAGE",
+          id: imageId,
+          updates: { filteredCanvas: null },
+        });
+      }
+      return;
+    }
+
+    // Debounce: wait 200ms before computing
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      applyBinarize(cropCanvas, filterConfig.binarize).then(
+        (filteredCanvas) => {
+          if (!cancelled) {
+            dispatch({
+              type: "UPDATE_IMAGE",
+              id: imageId,
+              updates: { filteredCanvas },
+            });
+          }
+        },
+        (err) => {
+          if (!cancelled) {
+            console.error("Binarize filter failed:", err);
+          }
+        },
+      );
+    }, 200);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterKey, selectedImage?.cropCanvas, state.selectedImageId]);
 
   const handleDragStart = useCallback(() => {
     isDraggingRef.current = true;
