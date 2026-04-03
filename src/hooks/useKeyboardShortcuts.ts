@@ -101,11 +101,13 @@ export function useKeyboardShortcuts() {
       if (meta && !shift && e.key === "s") {
         e.preventDefault();
         if (selectedImage?.cropCanvas) {
+          const filterType = selectedImage.editState?.filterConfig?.type ?? "none";
+          const sourceCanvas =
+            filterType !== "none" && selectedImage.filteredCanvas
+              ? selectedImage.filteredCanvas
+              : selectedImage.cropCanvas;
           const rotation = selectedImage.editState?.rotation ?? 0;
-          const final = rotateCanvas(
-            selectedImage.cropCanvas,
-            rotation,
-          );
+          const final = rotateCanvas(sourceCanvas, rotation);
           final.toBlob((blob: Blob | null) => {
             if (!blob) return;
             const url = URL.createObjectURL(blob);
