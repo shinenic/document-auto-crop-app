@@ -36,11 +36,11 @@ export default function TopBar() {
       if (!blob) return;
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
-      link.download = `cropped-${selectedImage.fileName.replace(/\.[^.]+$/, "")}.png`;
+      link.download = `cropped-${selectedImage.fileName.replace(/\.[^.]+$/, "")}.jpg`;
       link.href = url;
       link.click();
       URL.revokeObjectURL(url);
-    }, "image/png");
+    }, "image/jpeg", 0.92);
   }, [state.images, state.selectedImageId]);
 
   const handleExportAll = useCallback(async () => {
@@ -54,11 +54,11 @@ export default function TopBar() {
         const final = rotateCanvas(img.cropCanvas, rotation);
 
         const blob = await new Promise<Blob | null>((resolve) => {
-          final.toBlob((b) => resolve(b), "image/png");
+          final.toBlob((b) => resolve(b), "image/jpeg", 0.92);
         });
         if (!blob) continue;
 
-        const name = `cropped-${img.fileName.replace(/\.[^.]+$/, "")}.png`;
+        const name = `cropped-${img.fileName.replace(/\.[^.]+$/, "")}.jpg`;
         zip.file(name, blob);
       }
 

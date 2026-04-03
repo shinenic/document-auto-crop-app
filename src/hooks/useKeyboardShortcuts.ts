@@ -110,11 +110,11 @@ export function useKeyboardShortcuts() {
             if (!blob) return;
             const url = URL.createObjectURL(blob);
             const link = document.createElement("a");
-            link.download = `cropped-${selectedImage.fileName.replace(/\.[^.]+$/, "")}.png`;
+            link.download = `cropped-${selectedImage.fileName.replace(/\.[^.]+$/, "")}.jpg`;
             link.href = url;
             link.click();
             URL.revokeObjectURL(url);
-          }, "image/png");
+          }, "image/jpeg", 0.92);
         }
         return;
       }
