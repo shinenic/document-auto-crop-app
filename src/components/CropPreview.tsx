@@ -1,12 +1,14 @@
 "use client";
 
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useState } from "react";
 import { useApp } from "../context/AppContext";
 import { rotateCanvas } from "../lib/crop";
 
 export default function CropPreview() {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
   const { state } = useApp();
+  const [imgSrc, setImgSrc] = useState<string | null>(null);
+  const prevUrlRef = useRef<string | null>(null);
+
   const selectedImage = state.images.find(
     (img) => img.id === state.selectedImageId,
   );
@@ -16,9 +18,6 @@ export default function CropPreview() {
     !!selectedImage?.filteredCanvas;
 
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
     const cropCanvas = selectedImage?.cropCanvas;
     const filteredCanvas = selectedImage?.filteredCanvas;
     const filterType = selectedImage?.editState?.filterConfig?.type ?? "none";
@@ -28,34 +27,41 @@ export default function CropPreview() {
     const sourceCanvas =
       filterType !== "none" && filteredCanvas ? filteredCanvas : cropCanvas;
 
-    if (!sourceCanvas) {
-      // Show original if no crop, or clear
-      if (selectedImage?.originalCanvas) {
-        const src = selectedImage.originalCanvas;
-        const maxDim = 600;
-        const scale = Math.min(
-          maxDim / src.width,
-          maxDim / src.height,
-          1,
-        );
-        canvas.width = Math.round(src.width * scale);
-        canvas.height = Math.round(src.height * scale);
-        canvas
-          .getContext("2d")!
-          .drawImage(src, 0, 0, canvas.width, canvas.height);
-      } else {
-        canvas.width = 1;
-        canvas.height = 1;
-      }
+    // Fallback to original when no crop
+    const displayCanvas = sourceCanvas ?? selectedImage?.originalCanvas ?? null;
+
+    if (!displayCanvas) {
+      if (prevUrlRef.current) URL.revokeObjectURL(prevUrlRef.current);
+      prevUrlRef.current = null;
+      setImgSrc(null);
       return;
     }
 
-    const rotated = rotateCanvas(sourceCanvas, rotation);
-    canvas.width = rotated.width;
-    canvas.height = rotated.height;
-    const ctx = canvas.getContext("2d")!;
-    ctx.imageSmoothingEnabled = filterType === "none";
-    ctx.drawImage(rotated, 0, 0);
+    const rotated = rotation !== 0 && sourceCanvas
+      ? rotateCanvas(sourceCanvas, rotation)
+      : displayCanvas;
+
+    // Convert canvas to blob URL for <img> rendering
+    // Use PNG for binarized (lossless, preserves hard edges), JPEG for photos
+    const mimeType = filterType !== "none" ? "image/png" : "image/jpeg";
+    const quality = filterType !== "none" ? undefined : 0.92;
+
+    rotated.toBlob(
+      (blob) => {
+        if (!blob) return;
+        if (prevUrlRef.current) URL.revokeObjectURL(prevUrlRef.current);
+        const url = URL.createObjectURL(blob);
+        prevUrlRef.current = url;
+        setImgSrc(url);
+      },
+      mimeType,
+      quality,
+    );
+
+    // Cleanup on unmount
+    return () => {
+      // Don't revoke here — the next effect run or unmount cleanup handles it
+    };
   }, [
     selectedImage?.cropCanvas,
     selectedImage?.filteredCanvas,
@@ -63,6 +69,13 @@ export default function CropPreview() {
     selectedImage?.editState?.filterConfig?.type,
     selectedImage?.originalCanvas,
   ]);
+
+  // Revoke blob URL on unmount
+  useEffect(() => {
+    return () => {
+      if (prevUrlRef.current) URL.revokeObjectURL(prevUrlRef.current);
+    };
+  }, []);
 
   if (!selectedImage || selectedImage.status !== "ready") {
     return (
@@ -78,11 +91,16 @@ export default function CropPreview() {
 
   return (
     <div className="flex-1 flex items-center justify-center p-4 bg-[var(--bg-secondary)] overflow-hidden">
-      <canvas
-        ref={canvasRef}
-        className="max-w-full max-h-full object-contain"
-        style={isBinarized ? { imageRendering: "pixelated" } : undefined}
-      />
+      {imgSrc ? (
+        <img
+          src={imgSrc}
+          alt="Crop preview"
+          className="max-w-full max-h-full object-contain"
+          style={isBinarized ? { imageRendering: "pixelated" } : undefined}
+        />
+      ) : (
+        <p className="text-[var(--text-muted)] text-sm">No preview</p>
+      )}
     </div>
   );
 }
