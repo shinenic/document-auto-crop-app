@@ -47,3 +47,25 @@ All shared types in `lib/types.ts`. The core data flow: `File` -> `ImageEntry` (
 ## Spec
 
 The full product specification is in `docs/SPEC.md`. Consult it for UI layout, keyboard shortcuts, data model details, and known limitations.
+
+## Design Context
+
+### Users
+Music publishers and engravers processing sheet music scans at professional volume. Speed and accuracy matter more than hand-holding.
+
+### Brand Personality
+**Fast, Efficient, Technical.** The tool should feel like a sharp instrument — responsive, no-nonsense, zero wasted space.
+
+### Aesthetic Direction
+- Dark mode only. Deep near-black backgrounds with subtle blue undertones.
+- Teal accent (#5ce0c2) used sparingly for active states and primary actions.
+- System fonts. Monospace for numeric values. No decorative fonts.
+- References: Apple Preview (simplicity), Affinity Photo (professional dense panels).
+- Anti-references: Decorative/playful UIs, heavy gradients, bubbly components, excessive animations.
+
+### Design Principles
+1. **Content first** — The image is the hero. UI chrome should be minimal and recede.
+2. **Density without clutter** — Pack controls tightly but maintain clear hierarchy through spacing and typography weight.
+3. **Instant feedback** — Every interaction should feel immediate. Real-time previews over loading spinners.
+4. **Predictable controls** — Standard patterns (toggles, sliders, dropdowns). No clever custom widgets.
+5. **Accessible by default** — WCAG AA contrast. Keyboard shortcuts for all major actions. Clear focus indicators.
