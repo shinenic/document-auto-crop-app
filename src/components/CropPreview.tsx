@@ -4,6 +4,41 @@ import { useRef, useEffect, useCallback } from "react";
 import { useApp } from "../context/AppContext";
 import { rotateCanvas } from "../lib/crop";
 
+/**
+ * Progressive downscale: halve the image in steps until close to target size,
+ * then do a final drawImage to exact dimensions. Each bilinear 2x step
+ * approximates area-average filtering, matching native Lanczos quality.
+ */
+function drawProgressive(
+  ctx: CanvasRenderingContext2D,
+  source: HTMLCanvasElement | OffscreenCanvas,
+  dstW: number,
+  dstH: number,
+) {
+  let current: HTMLCanvasElement | OffscreenCanvas = source;
+  let curW = source.width;
+  let curH = source.height;
+
+  // Step down by halves while source is more than 2x the target
+  while (curW > dstW * 2 || curH > dstH * 2) {
+    const halfW = Math.max(Math.round(curW / 2), dstW);
+    const halfH = Math.max(Math.round(curH / 2), dstH);
+    const tmp = new OffscreenCanvas(halfW, halfH);
+    const tCtx = tmp.getContext("2d")!;
+    tCtx.imageSmoothingEnabled = true;
+    tCtx.imageSmoothingQuality = "high";
+    tCtx.drawImage(current, 0, 0, halfW, halfH);
+    current = tmp;
+    curW = halfW;
+    curH = halfH;
+  }
+
+  // Final step to exact target size
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(current, 0, 0, dstW, dstH);
+}
+
 export default function CropPreview() {
   const { state } = useApp();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -13,10 +48,6 @@ export default function CropPreview() {
   const selectedImage = state.images.find(
     (img) => img.id === state.selectedImageId,
   );
-
-  const isBinarized =
-    (selectedImage?.editState?.filterConfig?.type ?? "none") !== "none" &&
-    !!selectedImage?.filteredCanvas;
 
   // Draw source canvas onto display canvas with DPR scaling
   const draw = useCallback(() => {
@@ -69,20 +100,13 @@ export default function CropPreview() {
 
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-    if (isBinarized) {
-      ctx.imageSmoothingEnabled = false;
-    } else {
-      ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = "high";
-    }
-    ctx.drawImage(rotated, 0, 0, canvas.width, canvas.height);
+    drawProgressive(ctx, rotated, canvas.width, canvas.height);
   }, [
     selectedImage?.cropCanvas,
     selectedImage?.filteredCanvas,
     selectedImage?.editState?.rotation,
     selectedImage?.editState?.filterConfig?.type,
     selectedImage?.originalCanvas,
-    isBinarized,
   ]);
 
   // Keep drawRef current for ResizeObserver callback
