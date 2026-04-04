@@ -118,9 +118,12 @@ function binarizeToG4(
     }
   }
 
-  // Adaptive threshold -> 1-bit MSB-first packing (white=1, black=0)
-  const rowBytes = Math.ceil(upW / 8);
-  const bitPacked = new Uint8Array(rowBytes * upH);
+  // Adaptive threshold -> 1-bit MSB-first flat bitstream packing
+  // ts-ccitt-g4-encoder expects a flat bitstream (no row padding):
+  //   byteIndex = floor((y * width + x) / 8)
+  // Convention: 1 = black (dark), 0 = white (light) — matches library's binarizeToBitPacked
+  const totalPixels = upW * upH;
+  const bitPacked = new Uint8Array(Math.ceil(totalPixels / 8));
 
   for (let y = 0; y < upH; y++) {
     for (let x = 0; x < upW; x++) {
@@ -137,14 +140,14 @@ function binarizeToG4(
 
       const localMean = sum / count;
       const threshold = Math.max(0, Math.min(255, localMean + contrastOffset));
-      const isWhite = gray[y * upW + x] >= threshold;
+      const isBlack = gray[y * upW + x] < threshold;
 
-      if (isWhite) {
-        // White = 1, MSB-first
-        const byteIdx = y * rowBytes + (x >> 3);
-        bitPacked[byteIdx] |= 0x80 >> (x & 7);
+      if (isBlack) {
+        // Black = 1, MSB-first, flat bitstream (no row padding)
+        const bitIndex = y * upW + x;
+        bitPacked[bitIndex >> 3] |= 0x80 >> (bitIndex & 7);
       }
-      // Black = 0 (already zero-initialized)
+      // White = 0 (already zero-initialized)
     }
   }
 
@@ -199,7 +202,7 @@ async function buildPdf(pages: PageDescriptor[]): Promise<ArrayBuffer> {
           K: -1,
           Columns: width,
           Rows: height,
-          BlackIs1: false,
+          BlackIs1: true,
         },
         Length: g4Data.length,
       });
