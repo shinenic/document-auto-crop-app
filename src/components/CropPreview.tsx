@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useEffect, useCallback, useState } from "react";
+import { useRef, useEffect, useCallback } from "react";
 import { useApp } from "../context/AppContext";
 import { rotateCanvas } from "../lib/crop";
 
@@ -8,7 +8,7 @@ export default function CropPreview() {
   const { state } = useApp();
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [containerSize, setContainerSize] = useState<{ w: number; h: number } | null>(null);
+  const drawRef = useRef<() => void>(() => {});
 
   const selectedImage = state.images.find(
     (img) => img.id === state.selectedImageId,
@@ -18,22 +18,14 @@ export default function CropPreview() {
     (selectedImage?.editState?.filterConfig?.type ?? "none") !== "none" &&
     !!selectedImage?.filteredCanvas;
 
-  // Track container size
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const ro = new ResizeObserver((entries) => {
-      const { width, height } = entries[0].contentRect;
-      setContainerSize({ w: width, h: height });
-    });
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-
   // Draw source canvas onto display canvas with DPR scaling
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
-    if (!canvas || !containerSize) return;
+    const container = containerRef.current;
+    if (!canvas || !container) return;
+
+    const rect = container.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return;
 
     const cropCanvas = selectedImage?.cropCanvas;
     const filteredCanvas = selectedImage?.filteredCanvas;
@@ -61,8 +53,10 @@ export default function CropPreview() {
 
     // Fit source into container (object-contain logic)
     const pad = 32; // 16px padding on each side (p-4)
-    const availW = containerSize.w - pad;
-    const availH = containerSize.h - pad;
+    const availW = rect.width - pad;
+    const availH = rect.height - pad;
+    if (availW <= 0 || availH <= 0) return;
+
     const scale = Math.min(availW / srcW, availH / srcH, 1);
     const cssW = Math.round(srcW * scale);
     const cssH = Math.round(srcH * scale);
@@ -73,7 +67,8 @@ export default function CropPreview() {
     canvas.style.width = `${cssW}px`;
     canvas.style.height = `${cssH}px`;
 
-    const ctx = canvas.getContext("2d")!;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
     if (isBinarized) {
       ctx.imageSmoothingEnabled = false;
     } else {
@@ -87,13 +82,25 @@ export default function CropPreview() {
     selectedImage?.editState?.rotation,
     selectedImage?.editState?.filterConfig?.type,
     selectedImage?.originalCanvas,
-    containerSize,
     isBinarized,
   ]);
 
+  // Keep drawRef current for ResizeObserver callback
+  drawRef.current = draw;
+
+  // Redraw when image data changes
   useEffect(() => {
     draw();
   }, [draw]);
+
+  // Redraw when container resizes (reads DOM directly, no state needed)
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => drawRef.current());
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   if (!selectedImage || selectedImage.status !== "ready") {
     return (
