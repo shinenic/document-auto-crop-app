@@ -4,6 +4,7 @@
  */
 import type { ImageEntry } from "./types";
 import { rotateCanvas } from "./crop";
+import { applyEraseMask } from "./eraser";
 
 // ---------------------------------------------------------------------------
 // Page descriptor types (must match pdfExport.worker.ts protocol)
@@ -147,21 +148,37 @@ export async function exportPdf(
     const height = rotated.height;
 
     if (editState.filterConfig.type === "binarize") {
-      // Binarize path: send raw RGBA pixels to worker
-      const rgbaBytes = canvasToRgbaBytes(rotated);
-      const { blockRadiusBps, contrastOffset, upsamplingScale } =
-        editState.filterConfig.binarize;
+      const eraseMask = editState.eraseMask;
 
-      pages.push({
-        type: "binarize",
-        rgbaBytes,
-        width,
-        height,
-        blockRadiusBps,
-        contrastOffset,
-        upsamplingScale,
-      });
-      transferables.push(rgbaBytes);
+      if (eraseMask && img.filteredCanvas) {
+        // Has erase mask: apply it to the pre-binarized filteredCanvas, send as JPEG
+        const erased = applyEraseMask(img.filteredCanvas, eraseMask);
+        const erasedRotated = rotateCanvas(erased, editState.rotation);
+        const jpegBytes = await canvasToJpegBytes(erasedRotated, 0.95);
+        pages.push({
+          type: "jpeg",
+          jpegBytes,
+          width: erasedRotated.width,
+          height: erasedRotated.height,
+        });
+        transferables.push(jpegBytes);
+      } else {
+        // No erase mask: send raw RGBA for worker-side binarization (existing behavior)
+        const rgbaBytes = canvasToRgbaBytes(rotated);
+        const { blockRadiusBps, contrastOffset, upsamplingScale } =
+          editState.filterConfig.binarize;
+
+        pages.push({
+          type: "binarize",
+          rgbaBytes,
+          width,
+          height,
+          blockRadiusBps,
+          contrastOffset,
+          upsamplingScale,
+        });
+        transferables.push(rgbaBytes);
+      }
     } else {
       // JPEG path: convert canvas to JPEG blob bytes
       const jpegBytes = await canvasToJpegBytes(rotated, 0.92);

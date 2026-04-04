@@ -6,6 +6,7 @@ import { useApp } from "../context/AppContext";
 import { processImages } from "./imageProcessor";
 import { rotateCanvas } from "../lib/crop";
 import { exportPdf } from "../lib/pdfExport";
+import { applyEraseMask } from "../lib/eraser";
 
 export default function TopBar({ onManageImages }: { onManageImages?: () => void }) {
   const { state, dispatch } = useApp();
@@ -32,10 +33,16 @@ export default function TopBar({ onManageImages }: { onManageImages?: () => void
     if (!selectedImage?.cropCanvas) return;
 
     const filterType = selectedImage.editState?.filterConfig?.type ?? "none";
-    const sourceCanvas =
+    let sourceCanvas =
       filterType !== "none" && selectedImage.filteredCanvas
         ? selectedImage.filteredCanvas
         : selectedImage.cropCanvas;
+
+    // Apply erase mask if present
+    const eraseMask = selectedImage.editState?.eraseMask;
+    if (eraseMask && sourceCanvas && filterType !== "none") {
+      sourceCanvas = applyEraseMask(sourceCanvas, eraseMask);
+    }
 
     const rotation = selectedImage.editState?.rotation ?? 0;
     const final = rotateCanvas(sourceCanvas, rotation);
@@ -60,10 +67,15 @@ export default function TopBar({ onManageImages }: { onManageImages?: () => void
         if (!img.cropCanvas) continue;
 
         const filterType = img.editState?.filterConfig?.type ?? "none";
-        const sourceCanvas =
+        let sourceCanvas =
           filterType !== "none" && img.filteredCanvas
             ? img.filteredCanvas
             : img.cropCanvas;
+
+        const eraseMask = img.editState?.eraseMask;
+        if (eraseMask && sourceCanvas && filterType !== "none") {
+          sourceCanvas = applyEraseMask(sourceCanvas, eraseMask);
+        }
 
         const rotation = img.editState?.rotation ?? 0;
         const final = rotateCanvas(sourceCanvas, rotation);
