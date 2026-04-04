@@ -271,8 +271,8 @@ export default function ToolPanel() {
       <div>
         <h4 className="text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-2">Rotation</h4>
         <div className="flex flex-col gap-1">
-          <ToolButton label="Rotate 90\u00b0 CW (R)" onClick={rotateCW} disabled={!hasCrop} />
-          <ToolButton label="Rotate 90\u00b0 CCW (Shift+R)" onClick={rotateCCW} disabled={!hasCrop} />
+          <ToolButton label="Rotate 90° CW (R)" onClick={rotateCW} disabled={!hasCrop} />
+          <ToolButton label="Rotate 90° CCW (Shift+R)" onClick={rotateCCW} disabled={!hasCrop} />
         </div>
       </div>
 

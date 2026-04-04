@@ -134,7 +134,7 @@ export default function TopBar() {
           onClick={handleExport}
           disabled={!state.selectedImageId}
         >
-          Export
+          Download JPEG
         </button>
         <button
           className="px-3 py-1.5 text-xs font-medium rounded-lg bg-[var(--accent)] text-[var(--bg-primary)] hover:bg-[var(--accent-hover)] transition-colors disabled:opacity-40 flex items-center gap-1.5"
@@ -144,7 +144,7 @@ export default function TopBar() {
           {exporting && (
             <span className="inline-block w-3 h-3 border-2 border-[var(--bg-primary)] border-t-transparent rounded-full animate-spin" />
           )}
-          {exporting ? "Exporting..." : `Export All (${readyCount})`}
+          {exporting ? "Exporting..." : `Download All as ZIP (${readyCount})`}
         </button>
         <button
           className="px-3 py-1.5 text-xs font-medium rounded-lg bg-[var(--accent)] text-[var(--bg-primary)] hover:bg-[var(--accent-hover)] transition-colors disabled:opacity-40 flex items-center gap-1.5"
@@ -154,7 +154,7 @@ export default function TopBar() {
           {exportingPdf && (
             <span className="inline-block w-3 h-3 border-2 border-[var(--bg-primary)] border-t-transparent rounded-full animate-spin" />
           )}
-          {exportingPdf ? "Exporting..." : `Export PDF (${readyCount})`}
+          {exportingPdf ? "Exporting..." : `Download PDF (${readyCount})`}
         </button>
         <input
           ref={fileInputRef}
