@@ -56,6 +56,13 @@ function ensureWorker(): Worker {
       if (ok) p.resolve(data);
       else p.reject(new Error(error));
     };
+    worker.onerror = (event) => {
+      const msg = event.message || "PDF export worker error";
+      for (const [, p] of pending) {
+        p.reject(new Error(msg));
+      }
+      pending.clear();
+    };
   }
   return worker;
 }
