@@ -65,6 +65,8 @@ export default function CropPreview({
   const brushPointsRef = useRef<[number, number][]>([]);
   const lassoPointsRef = useRef<[number, number][]>([]);
   const overlayRef = useRef<HTMLCanvasElement>(null);
+  // Working mask: mutated during drag, committed to state on mouseUp
+  const workingMaskRef = useRef<import("../lib/types").EraseMask | null>(null);
 
   const [loupeVisible, setLoupeVisible] = useState(false);
 
@@ -72,16 +74,19 @@ export default function CropPreview({
     (img) => img.id === state.selectedImageId,
   );
 
+  // Map client coords to source coords. clamp=true allows out-of-bounds (for lasso).
   const clientToSource = useCallback(
-    (clientX: number, clientY: number): [number, number] | null => {
+    (clientX: number, clientY: number, clamp = false): [number, number] | null => {
       const canvas = canvasRef.current;
       const info = scaleInfoRef.current;
       if (!canvas || !info) return null;
       const rect = canvas.getBoundingClientRect();
       const relX = (clientX - rect.left) / rect.width;
       const relY = (clientY - rect.top) / rect.height;
-      if (relX < 0 || relX > 1 || relY < 0 || relY > 1) return null;
-      return [relX * info.srcW, relY * info.srcH];
+      if (!clamp && (relX < 0 || relX > 1 || relY < 0 || relY > 1)) return null;
+      const sx = Math.max(0, Math.min(info.srcW - 1, relX * info.srcW));
+      const sy = Math.max(0, Math.min(info.srcH - 1, relY * info.srcH));
+      return [sx, sy];
     },
     [],
   );
@@ -302,74 +307,97 @@ export default function CropPreview({
     return () => ro.disconnect();
   }, []);
 
+  // Draw brush strokes directly onto the display canvas (no React state update)
+  const drawBrushOnCanvas = useCallback((points: [number, number][]) => {
+    const canvas = canvasRef.current;
+    const info = scaleInfoRef.current;
+    if (!canvas || !info) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    const scaleX = (canvas.width / info.srcW);
+    const scaleY = (canvas.height / info.srcH);
+
+    ctx.fillStyle = "#ffffff";
+    for (const [cx, cy] of points) {
+      const px = cx * scaleX;
+      const py = cy * scaleY;
+      const r = brushSize * Math.min(scaleX, scaleY);
+      ctx.beginPath();
+      ctx.arc(px, py, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }, [brushSize]);
+
   // Eraser mouse handlers
   const handleEraserMouseDown = useCallback(
     (e: React.MouseEvent) => {
       if (!eraserActive || !selectedImage?.id || !selectedImage.editState) return;
-      const pt = clientToSource(e.clientX, e.clientY);
+      const allowClamp = eraserTool === "lasso";
+      const pt = clientToSource(e.clientX, e.clientY, allowClamp);
       if (!pt) return;
 
       erasingRef.current = true;
       dispatch({ type: "PUSH_HISTORY", id: selectedImage.id });
 
       if (eraserTool === "brush") {
-        brushPointsRef.current = [pt];
+        // Create working mask once, paint on it during drag, commit on mouseUp
         const mask = getOrCreateMask();
         if (mask) {
+          workingMaskRef.current = mask;
           paintBrushStroke(mask, [pt], brushSize);
-          dispatch({
-            type: "SET_EDIT_STATE",
-            id: selectedImage.id,
-            editState: { ...selectedImage.editState, eraseMask: mask },
-          });
+          drawBrushOnCanvas([pt]);
         }
+        brushPointsRef.current = [pt];
       } else {
         lassoPointsRef.current = [pt];
       }
     },
-    [eraserActive, eraserTool, brushSize, selectedImage, clientToSource, getOrCreateMask, dispatch],
+    [eraserActive, eraserTool, brushSize, selectedImage, clientToSource, getOrCreateMask, dispatch, drawBrushOnCanvas],
   );
 
   const handleEraserMouseMove = useCallback(
     (e: React.MouseEvent) => {
       if (!erasingRef.current || !selectedImage?.id || !selectedImage.editState) return;
-      const pt = clientToSource(e.clientX, e.clientY);
+      const allowClamp = eraserTool === "lasso";
+      const pt = clientToSource(e.clientX, e.clientY, allowClamp);
       if (!pt) return;
 
       if (eraserTool === "brush") {
         brushPointsRef.current.push(pt);
-        // For brush, we need to get the CURRENT mask from state (not create a new one each time)
-        const currentMask = selectedImage.editState.eraseMask;
-        const mask = currentMask
-          ? { width: currentMask.width, height: currentMask.height, data: new Uint8Array(currentMask.data) }
-          : getOrCreateMask();
+        const mask = workingMaskRef.current;
         if (mask) {
           paintBrushStroke(mask, [pt], brushSize);
-          dispatch({
-            type: "SET_EDIT_STATE",
-            id: selectedImage.id,
-            editState: { ...selectedImage.editState, eraseMask: mask },
-          });
+          drawBrushOnCanvas([pt]);
         }
       } else {
         lassoPointsRef.current.push(pt);
         drawLassoOverlay();
       }
     },
-    [eraserTool, brushSize, selectedImage, clientToSource, getOrCreateMask, dispatch, drawLassoOverlay],
+    [eraserTool, brushSize, selectedImage, clientToSource, drawLassoOverlay, drawBrushOnCanvas],
   );
 
   const handleEraserMouseUp = useCallback(() => {
     if (!erasingRef.current || !selectedImage?.id || !selectedImage.editState) return;
     erasingRef.current = false;
 
-    if (eraserTool === "lasso") {
+    if (eraserTool === "brush") {
+      // Commit the working mask to state
+      const mask = workingMaskRef.current;
+      if (mask) {
+        dispatch({
+          type: "SET_EDIT_STATE",
+          id: selectedImage.id,
+          editState: { ...selectedImage.editState, eraseMask: mask },
+        });
+        workingMaskRef.current = null;
+      }
+    } else {
       const points = lassoPointsRef.current;
       if (points.length >= 3) {
-        const currentMask = selectedImage.editState.eraseMask;
-        const mask = currentMask
-          ? { width: currentMask.width, height: currentMask.height, data: new Uint8Array(currentMask.data) }
-          : getOrCreateMask();
+        const mask = getOrCreateMask();
         if (mask) {
           fillLassoRegion(mask, points);
           dispatch({
