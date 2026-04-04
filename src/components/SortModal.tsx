@@ -77,17 +77,18 @@ function SortableItem({
         <span className="text-[10px] font-mono text-white">{index + 1}</span>
       </div>
 
-      {/* Remove button */}
+      {/* Remove button — always visible */}
       <button
-        className="absolute top-1.5 right-1.5 z-10 w-5 h-5 rounded-full bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-[var(--danger)]/80"
+        className="absolute top-1.5 right-1.5 z-10 w-6 h-6 rounded-md bg-[var(--danger)]/70 hover:bg-[var(--danger)] flex items-center justify-center transition-colors shadow-sm"
         onClick={(e) => {
           e.stopPropagation();
           onRemove(image.id);
         }}
         onPointerDown={(e) => e.stopPropagation()}
+        title="Remove image"
       >
-        <svg width="10" height="10" viewBox="0 0 10 10" fill="white">
-          <path d="M2.146 2.146a.5.5 0 0 1 .708 0L5 4.293l2.146-2.147a.5.5 0 0 1 .708.708L5.707 5l2.147 2.146a.5.5 0 0 1-.708.708L5 5.707 2.854 7.854a.5.5 0 0 1-.708-.708L4.293 5 2.146 2.854a.5.5 0 0 1 0-.708z" />
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round">
+          <path d="M18 6L6 18M6 6l12 12" />
         </svg>
       </button>
 
@@ -164,12 +165,17 @@ export default function SortModal({ onClose }: { onClose: () => void }) {
       <div className="bg-[var(--bg-secondary)] border border-[var(--border)] rounded-xl w-full max-w-5xl max-h-[85vh] flex flex-col shadow-2xl mx-4">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)]">
-          <h3 className="text-sm font-medium text-[var(--text-primary)]">
-            Manage Images
-            <span className="ml-2 text-[var(--text-muted)] font-normal">
-              {orderedImages.length} image{orderedImages.length !== 1 ? "s" : ""}
-            </span>
-          </h3>
+          <div>
+            <h3 className="text-sm font-medium text-[var(--text-primary)]">
+              Manage Images
+              <span className="ml-2 text-[var(--text-muted)] font-normal">
+                {orderedImages.length} image{orderedImages.length !== 1 ? "s" : ""}
+              </span>
+            </h3>
+            <p className="text-[10px] text-[var(--text-muted)] mt-0.5">
+              Drag to reorder &middot; Click <span className="text-[var(--danger)]">X</span> to remove
+            </p>
+          </div>
           <button
             className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
             onClick={onClose}

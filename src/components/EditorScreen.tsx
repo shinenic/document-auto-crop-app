@@ -112,8 +112,10 @@ export default function EditorScreen() {
 
   useEffect(() => {
     if (isDraggingRef.current) return;
-    if (!selectedImage?.editState || !selectedImage.originalCanvas)
+    if (!selectedImage?.editState || !selectedImage.originalCanvas) {
+      prevCropKeyRef.current = null; // reset so next editState triggers recompute
       return;
+    }
     if (cropKey === prevCropKeyRef.current) return;
     prevCropKeyRef.current = cropKey;
 
@@ -306,9 +308,11 @@ export default function EditorScreen() {
           <ImageList />
           {/* Resize handle */}
           <div
-            className="absolute top-0 right-0 w-1.5 h-full cursor-col-resize hover:bg-[var(--accent)]/30 active:bg-[var(--accent)]/50 transition-colors z-10"
+            className="absolute top-0 right-0 w-2 h-full cursor-col-resize hover:bg-[var(--accent)]/20 active:bg-[var(--accent)]/40 transition-colors z-10 flex items-center justify-center group"
             onPointerDown={handleResizePointerDown}
-          />
+          >
+            <div className="w-0.5 h-8 rounded-full bg-[var(--text-muted)]/30 group-hover:bg-[var(--accent)]/60 transition-colors" />
+          </div>
         </div>
         <div className="flex-1 flex min-w-0">
           <div className="flex-1 border-r border-[var(--border)] flex flex-col min-w-0">
