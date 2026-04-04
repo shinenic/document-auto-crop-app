@@ -135,6 +135,8 @@ export const PDF_PAGE_SIZES: PdfPageSize[] = [
   { label: "A4 Landscape", widthMm: 297, heightMm: 210 },
   { label: "Music 12×9″", widthMm: 305, heightMm: 229 },
   { label: "A3 Landscape", widthMm: 420, heightMm: 297 },
+  // Custom (user enters dimensions)
+  { label: "Custom", widthMm: -2, heightMm: -2 },
   // Fit to image (each page different)
   { label: "Fit to Image", widthMm: -1, heightMm: -1 },
 ];

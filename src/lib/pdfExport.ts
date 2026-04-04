@@ -121,6 +121,7 @@ function canvasToRgbaBytes(canvas: HTMLCanvasElement): ArrayBuffer {
  */
 export async function exportPdf(
   images: ImageEntry[],
+  pageSize?: { widthMm: number; heightMm: number },
   onProgress?: (current: number, total: number) => void,
 ): Promise<Blob> {
   // Filter to ready images that have a crop canvas and an edit state
@@ -205,7 +206,7 @@ export async function exportPdf(
 
   const pdfArrayBuffer = await new Promise<ArrayBuffer>((resolve, reject) => {
     pending.set(id, { resolve, reject });
-    w.postMessage({ id, pages }, transferables);
+    w.postMessage({ id, pages, pageSizeMm: pageSize }, transferables);
   });
 
   return new Blob([pdfArrayBuffer], { type: "application/pdf" });

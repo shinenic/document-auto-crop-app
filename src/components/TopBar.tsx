@@ -7,12 +7,17 @@ import { processImages } from "./imageProcessor";
 import { rotateCanvas } from "../lib/crop";
 import { exportPdf } from "../lib/pdfExport";
 import { applyEraseMask } from "../lib/eraser";
+import { PDF_PAGE_SIZES, detectBestPageSize } from "../lib/types";
+import type { PdfPageSize } from "../lib/types";
 
 export default function TopBar({ onManageImages }: { onManageImages?: () => void }) {
   const { state, dispatch } = useApp();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [exporting, setExporting] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
+  const [pdfPageSize, setPdfPageSize] = useState<PdfPageSize>(PDF_PAGE_SIZES[0]); // Auto Detect
+  const [customW, setCustomW] = useState(210);
+  const [customH, setCustomH] = useState(297);
 
   const handleAddImages = useCallback(
     (files: FileList | File[]) => {
@@ -104,7 +109,25 @@ export default function TopBar({ onManageImages }: { onManageImages?: () => void
   const handleExportPdf = useCallback(async () => {
     setExportingPdf(true);
     try {
-      const pdfBlob = await exportPdf(state.images);
+      // Resolve page size
+      let pageSize: { widthMm: number; heightMm: number } | undefined;
+      if (pdfPageSize.widthMm === 0) {
+        // Auto Detect
+        const readyImgs = state.images
+          .filter((img) => img.status === "ready" && img.cropCanvas)
+          .map((img) => ({ width: img.cropCanvas!.width, height: img.cropCanvas!.height }));
+        const detected = detectBestPageSize(readyImgs);
+        pageSize = { widthMm: detected.widthMm, heightMm: detected.heightMm };
+      } else if (pdfPageSize.widthMm === -2) {
+        // Custom
+        pageSize = { widthMm: customW, heightMm: customH };
+      } else if (pdfPageSize.widthMm > 0) {
+        // Fixed preset
+        pageSize = { widthMm: pdfPageSize.widthMm, heightMm: pdfPageSize.heightMm };
+      }
+      // widthMm === -1 → Fit to Image → pageSize stays undefined
+
+      const pdfBlob = await exportPdf(state.images, pageSize);
       const url = URL.createObjectURL(pdfBlob);
       const link = document.createElement("a");
       link.download = "cropped-images.pdf";
@@ -116,7 +139,7 @@ export default function TopBar({ onManageImages }: { onManageImages?: () => void
     } finally {
       setExportingPdf(false);
     }
-  }, [state.images]);
+  }, [state.images, pdfPageSize, customW, customH]);
 
   const readyCount = state.images.filter(
     (img) => img.status === "ready" && img.cropCanvas,
@@ -167,6 +190,42 @@ export default function TopBar({ onManageImages }: { onManageImages?: () => void
           )}
           {exporting ? "Exporting..." : `Download All as ZIP (${readyCount})`}
         </button>
+        <select
+          className="px-2 py-1.5 text-xs font-medium rounded-lg bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border border-[var(--border)] cursor-pointer"
+          value={pdfPageSize.label}
+          onChange={(e) => {
+            const found = PDF_PAGE_SIZES.find((s) => s.label === e.target.value);
+            if (found) setPdfPageSize(found);
+          }}
+        >
+          {PDF_PAGE_SIZES.map((s) => (
+            <option key={s.label} value={s.label}>
+              {s.label}{s.widthMm > 0 ? ` (${s.widthMm}×${s.heightMm})` : ""}
+            </option>
+          ))}
+        </select>
+        {pdfPageSize.widthMm === -2 && (
+          <div className="flex items-center gap-1">
+            <input
+              type="number"
+              className="w-14 px-1.5 py-1.5 text-xs rounded-lg bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border border-[var(--border)] text-center"
+              value={customW}
+              min={50}
+              max={1000}
+              onChange={(e) => setCustomW(Number(e.target.value) || 210)}
+            />
+            <span className="text-[10px] text-[var(--text-muted)]">×</span>
+            <input
+              type="number"
+              className="w-14 px-1.5 py-1.5 text-xs rounded-lg bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border border-[var(--border)] text-center"
+              value={customH}
+              min={50}
+              max={1000}
+              onChange={(e) => setCustomH(Number(e.target.value) || 297)}
+            />
+            <span className="text-[10px] text-[var(--text-muted)]">mm</span>
+          </div>
+        )}
         <button
           className="px-3 py-1.5 text-xs font-medium rounded-lg bg-[var(--accent)] text-[var(--bg-primary)] hover:bg-[var(--accent-hover)] transition-colors disabled:opacity-40 flex items-center gap-1.5"
           onClick={handleExportPdf}
