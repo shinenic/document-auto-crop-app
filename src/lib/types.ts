@@ -43,6 +43,14 @@ export const DEFAULT_FILTER_CONFIG: FilterConfig = {
   binarize: { ...DEFAULT_BINARIZE_CONFIG },
 };
 
+// --- Erase Mask ---
+
+export interface EraseMask {
+  width: number;
+  height: number;
+  data: Uint8Array; // single-channel: 255 = erased (white), 0 = keep
+}
+
 // --- Editor State ---
 
 export interface EditState {
@@ -50,6 +58,7 @@ export interface EditState {
   edgeFits: EdgeFit[];
   rotation: 0 | 90 | 180 | 270;
   filterConfig: FilterConfig;
+  eraseMask: EraseMask | null;
 }
 
 export interface ImageHistory {
