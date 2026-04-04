@@ -93,7 +93,7 @@ function SortableItem({
       </button>
 
       {/* Thumbnail */}
-      <div className="flex items-center justify-center p-1" style={{ minHeight: 280 }}>
+      <div className="flex items-center justify-center p-1" style={{ minHeight: 336 }}>
         <canvas
           ref={canvasRef}
           className="max-w-full max-h-full object-contain"
@@ -162,7 +162,7 @@ export default function SortModal({ onClose }: { onClose: () => void }) {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="bg-[var(--bg-secondary)] border border-[var(--border)] rounded-xl w-full max-w-5xl max-h-[85vh] flex flex-col shadow-2xl mx-4">
+      <div className="bg-[var(--bg-secondary)] border border-[var(--border)] rounded-xl w-full max-w-5xl flex flex-col shadow-2xl mx-4" style={{ maxHeight: "calc(100vh - 80px)" }}>
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)]">
           <div>
