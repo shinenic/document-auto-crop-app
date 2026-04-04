@@ -141,11 +141,12 @@ export default function ToolPanel({
 
   const batchFilter = useCallback(() => {
     if (!selectedImage?.editState) return;
+    if (eraserActive) onToggleEraser(); // exit eraser mode before batch apply
     dispatch({
       type: "BATCH_SET_FILTER",
       filterConfig: selectedImage.editState.filterConfig,
     });
-  }, [selectedImage, dispatch]);
+  }, [selectedImage, dispatch, eraserActive, onToggleEraser]);
 
   const clearEraser = useCallback(() => {
     if (!id || !selectedImage?.editState) return;

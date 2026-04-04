@@ -190,37 +190,50 @@ export default function EditorScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filterKey, selectedImage?.cropCanvas, state.selectedImageId]);
 
-  // Recompute filteredCanvas for non-selected images after batch filter
+  // Recompute filteredCanvas for non-selected images after batch filter.
+  // Processes sequentially to avoid flooding the binarize worker.
   useEffect(() => {
-    for (const img of state.images) {
-      if (img.id === state.selectedImageId) continue;
-      if (!img.cropCanvas || !img.editState) continue;
+    let cancelled = false;
 
-      const { filterConfig } = img.editState;
-      if (filterConfig.type === "none") {
-        if (img.filteredCanvas) {
-          dispatch({
-            type: "UPDATE_IMAGE",
-            id: img.id,
-            updates: { filteredCanvas: null },
-          });
-        }
-        continue;
-      }
+    async function processBatch() {
+      for (const img of state.images) {
+        if (cancelled) break;
+        if (img.id === state.selectedImageId) continue;
+        if (!img.cropCanvas || !img.editState) continue;
 
-      if (!img.filteredCanvas) {
-        applyBinarize(img.cropCanvas, filterConfig.binarize).then(
-          (filteredCanvas) => {
+        const { filterConfig } = img.editState;
+        if (filterConfig.type === "none") {
+          if (img.filteredCanvas) {
             dispatch({
               type: "UPDATE_IMAGE",
               id: img.id,
-              updates: { filteredCanvas },
+              updates: { filteredCanvas: null },
             });
-          },
-          (err) => console.error("Batch binarize failed for", img.id, err),
-        );
+          }
+          continue;
+        }
+
+        if (!img.filteredCanvas) {
+          try {
+            const filteredCanvas = await applyBinarize(img.cropCanvas, filterConfig.binarize);
+            if (!cancelled) {
+              dispatch({
+                type: "UPDATE_IMAGE",
+                id: img.id,
+                updates: { filteredCanvas },
+              });
+            }
+          } catch (err) {
+            if (!cancelled) {
+              console.error("Batch binarize failed for", img.id, err);
+            }
+          }
+        }
       }
     }
+
+    processBatch();
+    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.images.map((img) => img.editState?.filterConfig?.type).join(",")]);
 
