@@ -3,6 +3,7 @@
 import { useRef, useEffect, useCallback, useState } from "react";
 import { useApp } from "../context/AppContext";
 import { rotateCanvas } from "../lib/crop";
+import { applyEraseMask, createEraseMask, paintBrushStroke, fillLassoRegion } from "../lib/eraser";
 
 const LOUPE_CSS = 260;
 const LOUPE_ZOOM = 2.5;
@@ -49,7 +50,7 @@ export default function CropPreview({
   eraserTool?: "brush" | "lasso";
   brushSize?: number;
 } = {}) {
-  const { state } = useApp();
+  const { state, dispatch } = useApp();
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const loupeRef = useRef<HTMLCanvasElement>(null);
@@ -60,11 +61,77 @@ export default function CropPreview({
   // CSS display size → source pixel mapping
   const scaleInfoRef = useRef<{ cssW: number; cssH: number; srcW: number; srcH: number } | null>(null);
 
+  const erasingRef = useRef(false);
+  const brushPointsRef = useRef<[number, number][]>([]);
+  const lassoPointsRef = useRef<[number, number][]>([]);
+  const overlayRef = useRef<HTMLCanvasElement>(null);
+
   const [loupeVisible, setLoupeVisible] = useState(false);
 
   const selectedImage = state.images.find(
     (img) => img.id === state.selectedImageId,
   );
+
+  const clientToSource = useCallback(
+    (clientX: number, clientY: number): [number, number] | null => {
+      const canvas = canvasRef.current;
+      const info = scaleInfoRef.current;
+      if (!canvas || !info) return null;
+      const rect = canvas.getBoundingClientRect();
+      const relX = (clientX - rect.left) / rect.width;
+      const relY = (clientY - rect.top) / rect.height;
+      if (relX < 0 || relX > 1 || relY < 0 || relY > 1) return null;
+      return [relX * info.srcW, relY * info.srcH];
+    },
+    [],
+  );
+
+  const getOrCreateMask = useCallback((): import("../lib/types").EraseMask | null => {
+    if (!selectedImage?.editState || !selectedImage.filteredCanvas) return null;
+    const existing = selectedImage.editState.eraseMask;
+    if (existing) {
+      // Return a mutable copy for this editing session
+      return { width: existing.width, height: existing.height, data: new Uint8Array(existing.data) };
+    }
+    const fc = selectedImage.filteredCanvas;
+    return createEraseMask(fc.width, fc.height);
+  }, [selectedImage]);
+
+  const drawLassoOverlay = useCallback(() => {
+    const overlay = overlayRef.current;
+    const canvas = canvasRef.current;
+    const info = scaleInfoRef.current;
+    if (!overlay || !canvas || !info) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    overlay.width = Math.round(rect.width * dpr);
+    overlay.height = Math.round(rect.height * dpr);
+    overlay.style.width = `${rect.width}px`;
+    overlay.style.height = `${rect.height}px`;
+
+    const ctx = overlay.getContext("2d");
+    if (!ctx) return;
+    ctx.clearRect(0, 0, overlay.width, overlay.height);
+
+    const points = lassoPointsRef.current;
+    if (points.length < 2) return;
+
+    ctx.strokeStyle = "rgba(255, 100, 100, 0.8)";
+    ctx.lineWidth = 2 * dpr;
+    ctx.beginPath();
+    ctx.moveTo(
+      (points[0][0] / info.srcW) * overlay.width,
+      (points[0][1] / info.srcH) * overlay.height,
+    );
+    for (let i = 1; i < points.length; i++) {
+      ctx.lineTo(
+        (points[i][0] / info.srcW) * overlay.width,
+        (points[i][1] / info.srcH) * overlay.height,
+      );
+    }
+    ctx.stroke();
+  }, []);
 
   // Draw loupe content at current mouse position
   const drawLoupe = useCallback((clientX: number, clientY: number) => {
@@ -202,11 +269,22 @@ export default function CropPreview({
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     drawProgressive(ctx, rotated, canvas.width, canvas.height);
+
+    // Apply eraseMask overlay
+    const eraseMask = selectedImage?.editState?.eraseMask;
+    if (eraseMask && filterType !== "none" && filteredCanvas) {
+      const source = rotated instanceof HTMLCanvasElement ? rotated : displayCanvas;
+      const applied = applyEraseMask(source, eraseMask);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      drawProgressive(ctx, applied, canvas.width, canvas.height);
+      sourceRef.current = applied;
+    }
   }, [
     selectedImage?.cropCanvas,
     selectedImage?.filteredCanvas,
     selectedImage?.editState?.rotation,
     selectedImage?.editState?.filterConfig?.type,
+    selectedImage?.editState?.eraseMask,
     selectedImage?.originalCanvas,
   ]);
 
@@ -224,18 +302,112 @@ export default function CropPreview({
     return () => ro.disconnect();
   }, []);
 
+  // Eraser mouse handlers
+  const handleEraserMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      if (!eraserActive || !selectedImage?.id || !selectedImage.editState) return;
+      const pt = clientToSource(e.clientX, e.clientY);
+      if (!pt) return;
+
+      erasingRef.current = true;
+      dispatch({ type: "PUSH_HISTORY", id: selectedImage.id });
+
+      if (eraserTool === "brush") {
+        brushPointsRef.current = [pt];
+        const mask = getOrCreateMask();
+        if (mask) {
+          paintBrushStroke(mask, [pt], brushSize);
+          dispatch({
+            type: "SET_EDIT_STATE",
+            id: selectedImage.id,
+            editState: { ...selectedImage.editState, eraseMask: mask },
+          });
+        }
+      } else {
+        lassoPointsRef.current = [pt];
+      }
+    },
+    [eraserActive, eraserTool, brushSize, selectedImage, clientToSource, getOrCreateMask, dispatch],
+  );
+
+  const handleEraserMouseMove = useCallback(
+    (e: React.MouseEvent) => {
+      if (!erasingRef.current || !selectedImage?.id || !selectedImage.editState) return;
+      const pt = clientToSource(e.clientX, e.clientY);
+      if (!pt) return;
+
+      if (eraserTool === "brush") {
+        brushPointsRef.current.push(pt);
+        // For brush, we need to get the CURRENT mask from state (not create a new one each time)
+        const currentMask = selectedImage.editState.eraseMask;
+        const mask = currentMask
+          ? { width: currentMask.width, height: currentMask.height, data: new Uint8Array(currentMask.data) }
+          : getOrCreateMask();
+        if (mask) {
+          paintBrushStroke(mask, [pt], brushSize);
+          dispatch({
+            type: "SET_EDIT_STATE",
+            id: selectedImage.id,
+            editState: { ...selectedImage.editState, eraseMask: mask },
+          });
+        }
+      } else {
+        lassoPointsRef.current.push(pt);
+        drawLassoOverlay();
+      }
+    },
+    [eraserTool, brushSize, selectedImage, clientToSource, getOrCreateMask, dispatch, drawLassoOverlay],
+  );
+
+  const handleEraserMouseUp = useCallback(() => {
+    if (!erasingRef.current || !selectedImage?.id || !selectedImage.editState) return;
+    erasingRef.current = false;
+
+    if (eraserTool === "lasso") {
+      const points = lassoPointsRef.current;
+      if (points.length >= 3) {
+        const currentMask = selectedImage.editState.eraseMask;
+        const mask = currentMask
+          ? { width: currentMask.width, height: currentMask.height, data: new Uint8Array(currentMask.data) }
+          : getOrCreateMask();
+        if (mask) {
+          fillLassoRegion(mask, points);
+          dispatch({
+            type: "SET_EDIT_STATE",
+            id: selectedImage.id,
+            editState: { ...selectedImage.editState, eraseMask: mask },
+          });
+        }
+      }
+      lassoPointsRef.current = [];
+      const overlay = overlayRef.current;
+      if (overlay) {
+        const ctx = overlay.getContext("2d");
+        if (ctx) ctx.clearRect(0, 0, overlay.width, overlay.height);
+      }
+    }
+    brushPointsRef.current = [];
+  }, [eraserTool, selectedImage, getOrCreateMask, dispatch]);
+
   // Mouse handlers — direct DOM manipulation for 60fps loupe tracking
   const handleMouseMove = useCallback(
     (e: React.MouseEvent) => {
+      if (eraserActive) {
+        handleEraserMouseMove(e);
+        return;
+      }
       if (!loupeVisible) setLoupeVisible(true);
       drawLoupe(e.clientX, e.clientY);
     },
-    [loupeVisible, drawLoupe],
+    [eraserActive, handleEraserMouseMove, loupeVisible, drawLoupe],
   );
 
   const handleMouseLeave = useCallback(() => {
     setLoupeVisible(false);
-  }, []);
+    if (erasingRef.current) {
+      handleEraserMouseUp();
+    }
+  }, [handleEraserMouseUp]);
 
   if (!selectedImage || selectedImage.status !== "ready") {
     return (
@@ -254,16 +426,28 @@ export default function CropPreview({
       ref={containerRef}
       className="flex-1 flex items-center justify-center p-4 bg-[var(--bg-secondary)] overflow-hidden relative"
       onMouseMove={handleMouseMove}
+      onMouseDown={eraserActive ? handleEraserMouseDown : undefined}
+      onMouseUp={eraserActive ? handleEraserMouseUp : undefined}
       onMouseLeave={handleMouseLeave}
+      style={{ cursor: eraserActive ? "crosshair" : undefined }}
     >
       <canvas ref={canvasRef} />
+      {/* Lasso overlay */}
+      <canvas
+        ref={overlayRef}
+        className="pointer-events-none absolute"
+        style={{
+          opacity: eraserActive && eraserTool === "lasso" ? 1 : 0,
+        }}
+      />
+      {/* Loupe (hidden when eraser is active) */}
       <canvas
         ref={loupeRef}
         className="pointer-events-none absolute rounded-full shadow-lg"
         style={{
           width: LOUPE_CSS,
           height: LOUPE_CSS,
-          opacity: loupeVisible ? 1 : 0,
+          opacity: loupeVisible && !eraserActive ? 1 : 0,
           transition: "opacity 150ms",
           border: "2px solid rgba(255,255,255,0.15)",
           background: "#111",
