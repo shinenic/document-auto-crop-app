@@ -122,7 +122,7 @@ export interface PdfPageSize {
 
 export const PDF_PAGE_SIZES: PdfPageSize[] = [
   // Auto-detect
-  { label: "Auto Detect", widthMm: 0, heightMm: 0 },
+  { label: "Auto Detect PDF Size", widthMm: 0, heightMm: 0 },
   // Music portrait
   { label: "Music 9×12″", widthMm: 229, heightMm: 305 },
   { label: "Music Euro", widthMm: 235, heightMm: 310 },
