@@ -119,17 +119,13 @@ export default function SortModal({ onClose }: { onClose: () => void }) {
   const handleDragEnd = useCallback((event: DragEndEvent) => {
     const { active, over } = event;
     if (over && active.id !== over.id) {
-      setOrderedIds((ids) => {
-        const newIds = arrayMove(
-          ids,
-          ids.indexOf(active.id as string),
-          ids.indexOf(over.id as string),
-        );
-        dispatch({ type: "REORDER_IMAGES", orderedIds: newIds });
-        return newIds;
-      });
+      const oldIndex = orderedIds.indexOf(active.id as string);
+      const newIndex = orderedIds.indexOf(over.id as string);
+      const newIds = arrayMove(orderedIds, oldIndex, newIndex);
+      setOrderedIds(newIds);
+      dispatch({ type: "REORDER_IMAGES", orderedIds: newIds });
     }
-  }, [dispatch]);
+  }, [dispatch, orderedIds]);
 
   const handleRemove = useCallback(
     (id: string) => {
