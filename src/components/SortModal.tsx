@@ -92,7 +92,7 @@ function SortableItem({
       </button>
 
       {/* Thumbnail */}
-      <div className="flex items-center justify-center p-2" style={{ minHeight: 400 }}>
+      <div className="flex items-center justify-center p-1" style={{ minHeight: 280 }}>
         <canvas
           ref={canvasRef}
           className="max-w-full max-h-full object-contain"
