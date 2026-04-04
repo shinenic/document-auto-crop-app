@@ -151,17 +151,21 @@ export async function exportPdf(
       const eraseMask = editState.eraseMask;
 
       if (eraseMask && img.filteredCanvas) {
-        // Has erase mask: apply it to the pre-binarized filteredCanvas, send as JPEG
+        // Has erase mask: apply it, then send as binarize with scale=100
+        // so the worker still does CCITT G4 encoding (not JPEG)
         const erased = applyEraseMask(img.filteredCanvas, eraseMask);
         const erasedRotated = rotateCanvas(erased, editState.rotation);
-        const jpegBytes = await canvasToJpegBytes(erasedRotated, 0.95);
+        const rgbaBytes = canvasToRgbaBytes(erasedRotated);
         pages.push({
-          type: "jpeg",
-          jpegBytes,
+          type: "binarize",
+          rgbaBytes,
           width: erasedRotated.width,
           height: erasedRotated.height,
+          blockRadiusBps: 300,
+          contrastOffset: 0,
+          upsamplingScale: 100, // already binarized+upscaled, no further processing
         });
-        transferables.push(jpegBytes);
+        transferables.push(rgbaBytes);
       } else {
         // No erase mask: send raw RGBA for worker-side binarization (existing behavior)
         const rgbaBytes = canvasToRgbaBytes(rotated);

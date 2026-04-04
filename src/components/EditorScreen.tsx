@@ -38,18 +38,71 @@ export default function EditorScreen() {
     setEraserActive(false);
   }, [state.selectedImageId]);
 
-  // Exit eraser mode on Escape
+  // Eraser hotkeys: E=toggle, B=brush, L=lasso, [/]=brush size
   useEffect(() => {
-    if (!eraserActive) return;
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setEraserActive(false);
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
+
+      const img = getSelectedImage(stateRef.current);
+      const isBW = img?.editState?.filterConfig?.type === "binarize" && !!img.filteredCanvas;
+
+      if (e.key === "Escape" && eraserActive) {
+        e.preventDefault();
+        setEraserActive(false);
+        return;
+      }
+      if (e.key.toLowerCase() === "e" && isBW) {
+        e.preventDefault();
+        setEraserActive((v) => !v);
+        return;
+      }
+      if (eraserActive) {
+        if (e.key.toLowerCase() === "b") {
+          e.preventDefault();
+          setEraserTool("brush");
+          return;
+        }
+        if (e.key.toLowerCase() === "l") {
+          e.preventDefault();
+          setEraserTool("lasso");
+          return;
+        }
+        if (e.key === "[") {
+          e.preventDefault();
+          setBrushSize((s) => Math.max(5, s - 5));
+          return;
+        }
+        if (e.key === "]") {
+          e.preventDefault();
+          setBrushSize((s) => Math.min(100, s + 5));
+          return;
+        }
+      }
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
   }, [eraserActive]);
 
-  // Recompute full-res crop when editState changes (undo/redo/rotate/toggle)
   const selectedImage = getSelectedImage(state);
+
+  // Clear eraseMask when filteredCanvas dimensions change (crop geometry changed)
+  useEffect(() => {
+    if (!selectedImage?.editState?.eraseMask || !selectedImage.filteredCanvas) return;
+    const mask = selectedImage.editState.eraseMask;
+    const fc = selectedImage.filteredCanvas;
+    if (mask.width !== fc.width || mask.height !== fc.height) {
+      dispatch({
+        type: "SET_EDIT_STATE",
+        id: selectedImage.id,
+        editState: { ...selectedImage.editState, eraseMask: null },
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedImage?.filteredCanvas]);
+
+  // Recompute full-res crop when editState changes (undo/redo/rotate/toggle)
   const cropKey = selectedImage?.editState
     ? JSON.stringify({
         corners: selectedImage.editState.corners,

@@ -68,6 +68,19 @@ export default function CropPreview({
   // Working mask: mutated during drag, committed to state on mouseUp
   const workingMaskRef = useRef<import("../lib/types").EraseMask | null>(null);
 
+  // Reset eraser state when switching tools or deactivating
+  useEffect(() => {
+    erasingRef.current = false;
+    brushPointsRef.current = [];
+    lassoPointsRef.current = [];
+    workingMaskRef.current = null;
+    const overlay = overlayRef.current;
+    if (overlay) {
+      const ctx = overlay.getContext("2d");
+      if (ctx) ctx.clearRect(0, 0, overlay.width, overlay.height);
+    }
+  }, [eraserTool, eraserActive]);
+
   const [loupeVisible, setLoupeVisible] = useState(false);
 
   const selectedImage = state.images.find(
