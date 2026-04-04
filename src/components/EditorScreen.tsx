@@ -312,9 +312,9 @@ export default function EditorScreen() {
         </div>
         <div className="flex-1 flex min-w-0">
           <div className="flex-1 border-r border-[var(--border)] flex flex-col min-w-0">
-            <div className="px-3 py-2 border-b border-[var(--border)]">
-              <h4 className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">
-                Original + Editor
+            <div className="px-3 py-1.5 border-b border-[var(--border)]">
+              <h4 className="text-[9px] uppercase tracking-[0.1em] text-[var(--text-muted)] font-semibold">
+                Editor
               </h4>
             </div>
             <QuadEditor
@@ -323,9 +323,9 @@ export default function EditorScreen() {
             />
           </div>
           <div className="flex-1 flex flex-col min-w-0">
-            <div className="px-3 py-2 border-b border-[var(--border)]">
-              <h4 className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">
-                Crop Preview
+            <div className="px-3 py-1.5 border-b border-[var(--border)]">
+              <h4 className="text-[9px] uppercase tracking-[0.1em] text-[var(--text-muted)] font-semibold">
+                Preview
               </h4>
             </div>
             <CropPreview
