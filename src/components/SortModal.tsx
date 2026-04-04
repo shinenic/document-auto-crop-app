@@ -19,6 +19,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { useApp } from "../context/AppContext";
+import { drawProgressive } from "../lib/drawProgressive";
 import type { ImageEntry } from "../lib/types";
 
 function SortableItem({
@@ -50,12 +51,17 @@ function SortableItem({
     const canvas = canvasRef.current;
     const source = image.cropCanvas ?? image.originalCanvas;
     if (!canvas || !source) return;
-    const maxDim = 220;
+    const dpr = window.devicePixelRatio || 1;
+    const maxDim = 300;
     const scale = Math.min(maxDim / source.width, maxDim / source.height);
-    canvas.width = Math.round(source.width * scale);
-    canvas.height = Math.round(source.height * scale);
+    const cssW = Math.round(source.width * scale);
+    const cssH = Math.round(source.height * scale);
+    canvas.width = Math.round(cssW * dpr);
+    canvas.height = Math.round(cssH * dpr);
+    canvas.style.width = `${cssW}px`;
+    canvas.style.height = `${cssH}px`;
     const ctx = canvas.getContext("2d")!;
-    ctx.drawImage(source, 0, 0, canvas.width, canvas.height);
+    drawProgressive(ctx, source, canvas.width, canvas.height);
   }, [image.cropCanvas, image.originalCanvas]);
 
   return (

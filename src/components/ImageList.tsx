@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useApp } from "../context/AppContext";
 import { rotateCanvas } from "../lib/crop";
+import { drawProgressive } from "../lib/drawProgressive";
 import type { EditState } from "../lib/types";
 
 function Thumbnail({
@@ -60,15 +61,20 @@ function Thumbnail({
         ? rotateCanvas(source, editState.rotation)
         : source;
 
-    // Scale based on container width (minus padding)
-    const maxW = Math.max(containerWidth - 20, 40); // 20px = 2 * p-2 + 2 * p-1.5
-    const maxH = maxW * 0.75; // 4:3 aspect box
+    // Scale based on container width with DPR for crisp rendering
+    const dpr = window.devicePixelRatio || 1;
+    const maxW = Math.max(containerWidth - 20, 40);
+    const maxH = maxW * 0.75;
     const scale = Math.min(maxW / display.width, maxH / display.height);
-    canvas.width = Math.round(display.width * scale);
-    canvas.height = Math.round(display.height * scale);
+    const cssW = Math.round(display.width * scale);
+    const cssH = Math.round(display.height * scale);
+    canvas.width = Math.round(cssW * dpr);
+    canvas.height = Math.round(cssH * dpr);
+    canvas.style.width = `${cssW}px`;
+    canvas.style.height = `${cssH}px`;
 
     const ctx = canvas.getContext("2d")!;
-    ctx.drawImage(display, 0, 0, canvas.width, canvas.height);
+    drawProgressive(ctx, display, canvas.width, canvas.height);
   }, [originalCanvas, cropCanvas, filteredCanvas, editState, containerWidth]);
 
   return (

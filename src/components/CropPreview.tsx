@@ -4,42 +4,11 @@ import { useRef, useEffect, useCallback, useState } from "react";
 import { useApp } from "../context/AppContext";
 import { rotateCanvas } from "../lib/crop";
 import { applyEraseMask, createEraseMask, paintBrushStroke, fillLassoRegion } from "../lib/eraser";
+import { drawProgressive } from "../lib/drawProgressive";
 
 const LOUPE_CSS = 260;
 const LOUPE_ZOOM = 2.5;
 const LOUPE_OFFSET = 24;
-
-/**
- * Progressive downscale: halve the image in steps until close to target size,
- * then do a final drawImage to exact dimensions.
- */
-function drawProgressive(
-  ctx: CanvasRenderingContext2D,
-  source: HTMLCanvasElement | OffscreenCanvas,
-  dstW: number,
-  dstH: number,
-) {
-  let current: HTMLCanvasElement | OffscreenCanvas = source;
-  let curW = source.width;
-  let curH = source.height;
-
-  while (curW > dstW * 2 || curH > dstH * 2) {
-    const halfW = Math.max(Math.round(curW / 2), dstW);
-    const halfH = Math.max(Math.round(curH / 2), dstH);
-    const tmp = new OffscreenCanvas(halfW, halfH);
-    const tCtx = tmp.getContext("2d")!;
-    tCtx.imageSmoothingEnabled = true;
-    tCtx.imageSmoothingQuality = "high";
-    tCtx.drawImage(current, 0, 0, halfW, halfH);
-    current = tmp;
-    curW = halfW;
-    curH = halfH;
-  }
-
-  ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = "high";
-  ctx.drawImage(current, 0, 0, dstW, dstH);
-}
 
 export default function CropPreview({
   eraserActive = false,
