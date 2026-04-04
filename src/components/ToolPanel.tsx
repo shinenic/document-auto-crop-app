@@ -125,14 +125,14 @@ function ToolBtn({
 
   return (
     <button
-      className={`flex items-center gap-2 w-full px-2.5 py-1.5 text-[11px] font-medium rounded-md transition-colors disabled:opacity-25 disabled:pointer-events-none ${base} ${className}`}
+      className={`flex items-center gap-2 w-full px-2.5 py-2 text-xs font-medium rounded-md transition-colors disabled:opacity-25 disabled:pointer-events-none ${base} ${className}`}
       onClick={onClick}
       disabled={disabled}
     >
       {icon && <span className="shrink-0 opacity-80">{icon}</span>}
       <span className="flex-1 text-left">{label}</span>
       {shortcut && (
-        <span className="text-[9px] text-[var(--text-muted)] font-mono shrink-0">{shortcut}</span>
+        <span className="text-[10px] text-[var(--text-muted)] font-mono shrink-0">{shortcut}</span>
       )}
     </button>
   );
@@ -141,7 +141,7 @@ function ToolBtn({
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
-      <h4 className="text-[9px] uppercase tracking-[0.1em] text-[var(--text-muted)] mb-1.5 px-0.5 font-semibold">{title}</h4>
+      <h4 className="text-[10px] uppercase tracking-[0.08em] text-[var(--text-secondary)] mb-2 px-0.5 font-semibold">{title}</h4>
       {children}
     </div>
   );
@@ -168,9 +168,9 @@ function Slider({
 }) {
   return (
     <label className="flex flex-col gap-1 px-0.5">
-      <div className="flex justify-between text-[10px]">
-        <span className="text-[var(--text-muted)]">{label}</span>
-        <span className="font-mono text-[var(--text-secondary)]">{value}</span>
+      <div className="flex justify-between text-[11px]">
+        <span className="text-[var(--text-secondary)]">{label}</span>
+        <span className="font-mono text-[var(--text-primary)]">{value}</span>
       </div>
       <input
         type="range"
@@ -203,7 +203,7 @@ function TogglePill({
       {options.map((opt) => (
         <button
           key={opt.value}
-          className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 text-[10px] font-medium transition-colors ${
+          className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 text-[11px] font-medium transition-colors ${
             value === opt.value
               ? "bg-[var(--accent-muted)] text-[var(--accent)]"
               : "bg-[var(--bg-tertiary)] text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
@@ -451,39 +451,39 @@ export default function ToolPanel({
 
       {/* Edge Curves — reversed: Bottom → Left → Right → Top */}
       <Section title="Edge Curves">
-        <div className="flex flex-col gap-0.5">
+        <div className="flex flex-col gap-1">
           {BEZIER_ORDER.map((i) => {
             const label = EDGE_LABELS[i];
             const arc = selectedImage?.editState?.edgeFits[i]?.isArc ?? false;
             return (
-              <div key={i} className="flex items-center gap-1 group">
-                <span className={`flex-1 text-[11px] ${arc ? "text-[var(--accent)]" : "text-[var(--text-secondary)]"}`}>
+              <div key={i} className="flex items-center gap-1.5">
+                <span className="w-12 text-xs text-[var(--text-primary)] font-medium shrink-0">
                   {label}
                 </span>
-                <button
-                  className={`w-7 h-6 flex items-center justify-center rounded transition-colors ${
-                    arc
-                      ? "bg-[var(--accent-muted)] text-[var(--accent)]"
-                      : "bg-[var(--bg-tertiary)] text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
-                  } disabled:opacity-25 disabled:pointer-events-none`}
-                  onClick={() => { if (!arc) toggleEdge(i); }}
-                  disabled={!hasCrop || arc}
-                  title={`Add curve to ${label.toLowerCase()} edge`}
-                >
-                  <IconCurve />
-                </button>
-                <button
-                  className={`w-7 h-6 flex items-center justify-center rounded transition-colors ${
-                    !arc
-                      ? "bg-[var(--bg-tertiary)] text-[var(--text-muted)]"
-                      : "bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-                  } disabled:opacity-25 disabled:pointer-events-none`}
-                  onClick={() => removeEdgeCurve(i)}
-                  disabled={!hasCrop || !arc}
-                  title={`Straighten ${label.toLowerCase()} edge`}
-                >
-                  <IconLine />
-                </button>
+                <div className="flex flex-1 rounded-md overflow-hidden border border-[var(--border)]">
+                  <button
+                    className={`flex-1 flex items-center justify-center gap-1 py-1.5 text-[10px] font-medium transition-colors ${
+                      !arc
+                        ? "bg-[var(--bg-elevated)] text-[var(--text-primary)]"
+                        : "bg-[var(--bg-tertiary)] text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+                    } disabled:opacity-25 disabled:pointer-events-none`}
+                    onClick={() => { if (arc) removeEdgeCurve(i); }}
+                    disabled={!hasCrop || !arc}
+                  >
+                    <IconLine /> Line
+                  </button>
+                  <button
+                    className={`flex-1 flex items-center justify-center gap-1 py-1.5 text-[10px] font-medium transition-colors ${
+                      arc
+                        ? "bg-[var(--accent-muted)] text-[var(--accent)]"
+                        : "bg-[var(--bg-tertiary)] text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+                    } disabled:opacity-25 disabled:pointer-events-none`}
+                    onClick={() => { if (!arc) toggleEdge(i); }}
+                    disabled={!hasCrop || arc}
+                  >
+                    <IconCurve /> Curve
+                  </button>
+                </div>
               </div>
             );
           })}
