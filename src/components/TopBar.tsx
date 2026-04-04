@@ -188,7 +188,7 @@ export default function TopBar({ onManageImages }: { onManageImages?: () => void
           {exporting && (
             <span className="inline-block w-3 h-3 border-2 border-[var(--bg-primary)] border-t-transparent rounded-full animate-spin" />
           )}
-          {exporting ? "Exporting..." : `Download All as ZIP (${readyCount})`}
+          {exporting ? "Exporting..." : `Download All Images as ZIP (${readyCount})`}
         </button>
         <select
           className="px-2 py-1.5 text-xs font-medium rounded-lg bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border border-[var(--border)] cursor-pointer"
