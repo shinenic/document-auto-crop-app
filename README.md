@@ -1,36 +1,47 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Document Auto-Crop
 
-## Getting Started
+A client-side document cropping web app with AI-powered boundary detection. Upload photos of documents (sheet music, papers, etc.), auto-detect edges using a segmentation model, refine with interactive bezier curve editing, apply B&W filters with eraser tools, and export as JPEG, ZIP, or multi-page PDF with CCITT G4 compression.
 
-First, run the development server:
+All processing runs in the browser. No backend required.
+
+## Features
+
+- **AI boundary detection** -- ONNX segmentation model (DeepLabV3+ MobileNetV2) detects document edges automatically
+- **Interactive quad editor** -- Drag corners and bezier control points to refine crop boundaries
+- **B&W filter** -- Adaptive threshold binarization with configurable parameters
+- **Eraser tool** -- Brush and lasso modes to erase unwanted marks on B&W images
+- **PDF export** -- Multi-page PDF with CCITT G4 encoding, configurable page sizes (music publisher presets, A4, Letter, custom)
+- **Batch operations** -- Rotate and apply filters to all images at once
+- **Image management** -- Drag-and-drop reorder, remove, and sort images
+- **HiDPI rendering** -- Progressive downscaling with DPR-aware canvas for Retina displays
+
+## Scripts
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm run dev      # Start dev server (Turbopack) at localhost:3000
+npm run build    # Static export build (output: 'export')
+npm run lint     # ESLint
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Tech Stack
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+| Layer | Technology |
+|-------|-----------|
+| Framework | Next.js 16 (App Router, static export) |
+| Language | TypeScript 5 |
+| UI | React 19, Tailwind CSS v4 |
+| AI Inference | ONNX Runtime Web (WASM) via Web Worker |
+| PDF | pdf-lib + ts-ccitt-g4-encoder via Web Worker |
+| DND | @dnd-kit/core + @dnd-kit/sortable |
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Architecture
 
-## Learn More
+```
+Upload → ONNX inference (worker) → Quad detection → Interactive editor
+                                                          ↓
+                                          Perspective crop (Coons patch)
+                                                          ↓
+                                    B&W filter (worker) → Eraser → Export
+```
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Processing pipeline runs entirely in Web Workers to keep the UI responsive. State management uses React `useReducer` with per-image undo/redo history (50 levels).
