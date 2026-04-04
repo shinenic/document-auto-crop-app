@@ -1,21 +1,25 @@
 @import "tailwindcss";
 
 :root {
-  --bg-primary: #0c0c0e;
-  --bg-secondary: #131316;
-  --bg-tertiary: #1a1a1f;
-  --bg-elevated: #242429;
-  --text-primary: #ececef;
-  --text-secondary: #b0b0b8;
-  --text-muted: #6e6e7a;
-  --accent: #5ce0c2;
-  --accent-hover: #78eed3;
-  --accent-muted: rgba(92, 224, 194, 0.12);
-  --danger: #f06060;
-  --danger-muted: rgba(240, 96, 96, 0.12);
-  --warning: #f0a030;
-  --border: #27272e;
-  --border-hover: #38383f;
+  /* Backgrounds — subtle blue undertone for depth */
+  --bg-primary: #0b0b0f;
+  --bg-secondary: #111115;
+  --bg-tertiary: #191920;
+  --bg-elevated: #222229;
+  /* Text — 3-level hierarchy */
+  --text-primary: #e8e8ed;
+  --text-secondary: #9d9daa;
+  --text-muted: #5c5c6a;
+  /* Accent */
+  --accent: #4dd4b4;
+  --accent-hover: #6aeaca;
+  --accent-muted: rgba(77, 212, 180, 0.10);
+  /* Semantic */
+  --danger: #e85555;
+  --danger-muted: rgba(232, 85, 85, 0.10);
+  /* Borders */
+  --border: #1f1f28;
+  --border-hover: #2e2e38;
 }
 
 * {
@@ -29,23 +33,17 @@ body {
   margin: 0;
   overflow: hidden;
   height: 100dvh;
+  /* Subtle noise texture for depth */
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.02'/%3E%3C/svg%3E");
 }
 
-::-webkit-scrollbar {
-  width: 5px;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-::-webkit-scrollbar-thumb {
-  background: var(--border);
-  border-radius: 3px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: var(--border-hover);
-}
+/* Scrollbar */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--border-hover); }
 
-/* Slider styling */
+/* Range slider */
 input[type="range"] {
   -webkit-appearance: none;
   appearance: none;
@@ -53,20 +51,29 @@ input[type="range"] {
   cursor: pointer;
 }
 input[type="range"]::-webkit-slider-runnable-track {
-  height: 3px;
-  border-radius: 2px;
+  height: 2px;
+  border-radius: 1px;
   background: var(--bg-elevated);
 }
 input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
-  width: 12px;
-  height: 12px;
+  width: 11px;
+  height: 11px;
   border-radius: 50%;
   background: var(--accent);
   margin-top: -4.5px;
-  border: none;
-  box-shadow: 0 0 4px rgba(92, 224, 194, 0.3);
+  border: 2px solid var(--bg-secondary);
+  box-shadow: 0 0 0 1px rgba(77, 212, 180, 0.2);
+  transition: box-shadow 0.15s;
+}
+input[type="range"]::-webkit-slider-thumb:hover {
+  box-shadow: 0 0 0 3px rgba(77, 212, 180, 0.15);
 }
 input[type="range"]:disabled::-webkit-slider-thumb {
-  opacity: 0.3;
+  opacity: 0.25;
+}
+
+/* Panel depth */
+.panel-inset {
+  box-shadow: inset 1px 0 0 rgba(255,255,255,0.02);
 }

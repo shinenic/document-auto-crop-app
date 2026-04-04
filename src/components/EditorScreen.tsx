@@ -304,7 +304,7 @@ export default function EditorScreen() {
     <div className="h-dvh flex flex-col">
       <TopBar onManageImages={() => setSortModalOpen(true)} />
       <div className="flex-1 flex min-h-0">
-        <div className="flex flex-col flex-shrink-0 relative border-r border-[var(--border)]" style={{ width: sidebarWidth }}>
+        <div className="flex flex-col flex-shrink-0 relative border-r border-[var(--border)] bg-[var(--bg-secondary)]" style={{ width: sidebarWidth }}>
           <ImageList />
           {/* Resize handle */}
           <div
@@ -316,8 +316,8 @@ export default function EditorScreen() {
         </div>
         <div className="flex-1 flex min-w-0">
           <div className="flex-1 border-r border-[var(--border)] flex flex-col min-w-0">
-            <div className="px-3 py-1.5 border-b border-[var(--border)]">
-              <h4 className="text-[9px] uppercase tracking-[0.1em] text-[var(--text-muted)] font-semibold">
+            <div className="px-3 py-1.5 border-b border-[var(--border)] bg-[var(--bg-secondary)]">
+              <h4 className="text-[11px] uppercase tracking-[0.06em] text-[var(--text-muted)] font-semibold">
                 Editor
               </h4>
             </div>
@@ -327,8 +327,8 @@ export default function EditorScreen() {
             />
           </div>
           <div className="flex-1 flex flex-col min-w-0">
-            <div className="px-3 py-1.5 border-b border-[var(--border)]">
-              <h4 className="text-[9px] uppercase tracking-[0.1em] text-[var(--text-muted)] font-semibold">
+            <div className="px-3 py-1.5 border-b border-[var(--border)] bg-[var(--bg-secondary)]">
+              <h4 className="text-[11px] uppercase tracking-[0.06em] text-[var(--text-muted)] font-semibold">
                 Preview
               </h4>
             </div>

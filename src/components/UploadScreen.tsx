@@ -31,75 +31,85 @@ export default function UploadScreen() {
   );
 
   return (
-    <div className="h-dvh flex flex-col items-center justify-center p-8">
-      <div className="text-center mb-8">
-        <h1 className="text-3xl font-semibold tracking-tight mb-2">
+    <div className="h-dvh flex flex-col items-center justify-center p-8 relative overflow-hidden">
+      {/* Subtle staff lines background */}
+      <div className="absolute inset-0 pointer-events-none opacity-[0.03]" aria-hidden>
+        <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <pattern id="staff" x="0" y="0" width="100%" height="48" patternUnits="userSpaceOnUse">
+              {[0, 10, 20, 30, 40].map((y) => (
+                <line key={y} x1="0" y1={y} x2="100%" y2={y} stroke="currentColor" strokeWidth="1" />
+              ))}
+            </pattern>
+          </defs>
+          <rect width="100%" height="100%" fill="url(#staff)" />
+        </svg>
+      </div>
+
+      <div className="text-center mb-10 relative">
+        <h1 className="text-3xl font-semibold tracking-tight mb-3 text-[var(--text-primary)]">
           Document Auto-Crop
         </h1>
-        <p className="text-[var(--text-secondary)]">
-          Upload document photos for automatic boundary detection and
-          perspective correction
+        <p className="text-[var(--text-secondary)] text-[15px] leading-relaxed max-w-md mx-auto">
+          Upload document photos for automatic boundary detection,
+          perspective correction, and B&W processing
         </p>
       </div>
 
       <div
         className={`
-          w-full max-w-xl aspect-[4/3] rounded-2xl border-2 border-dashed
-          flex flex-col items-center justify-center gap-4 cursor-pointer
+          relative w-full max-w-lg aspect-[4/3] rounded-xl border-2 border-dashed
+          flex flex-col items-center justify-center gap-5 cursor-pointer
           transition-all duration-200
           ${
             dragOver
-              ? "border-[var(--accent)] bg-[var(--accent-muted)] scale-[1.02]"
-              : "border-[var(--border)] hover:border-[var(--border-hover)] bg-[var(--bg-secondary)]"
+              ? "border-[var(--accent)] bg-[var(--accent-muted)] scale-[1.01]"
+              : "border-[var(--border-hover)] hover:border-[var(--accent)]/40 bg-[var(--bg-secondary)]"
           }
         `}
         onDrop={handleDrop}
-        onDragOver={(e) => {
-          e.preventDefault();
-          setDragOver(true);
-        }}
+        onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
         onDragLeave={() => setDragOver(false)}
         onClick={() => fileInputRef.current?.click()}
       >
-        <div className="w-16 h-16 rounded-full bg-[var(--bg-tertiary)] flex items-center justify-center">
-          <svg
-            className="w-8 h-8 text-[var(--text-secondary)]"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={1.5}
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"
-            />
+        <div className={`w-14 h-14 rounded-xl flex items-center justify-center transition-colors ${dragOver ? "bg-[var(--accent)]/15" : "bg-[var(--bg-tertiary)]"}`}>
+          <svg className={`w-7 h-7 transition-colors ${dragOver ? "text-[var(--accent)]" : "text-[var(--text-muted)]"}`}
+            fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round"
+              d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
           </svg>
         </div>
         <div className="text-center">
-          <p className="text-[var(--text-primary)] font-medium">
+          <p className="text-[var(--text-primary)] font-medium text-[14px]">
             Drop images here
           </p>
-          <p className="text-sm text-[var(--text-muted)] mt-1">
-            or click to browse files
+          <p className="text-[13px] text-[var(--text-muted)] mt-1">
+            or click to browse
           </p>
         </div>
 
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          multiple
-          className="hidden"
-          onChange={(e) =>
-            e.target.files && handleFiles(e.target.files)
-          }
-        />
+        <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden"
+          onChange={(e) => e.target.files && handleFiles(e.target.files)} />
       </div>
 
-      <p className="text-xs text-[var(--text-muted)] mt-4">
-        Supports JPEG, PNG, WebP
-      </p>
+      <div className="flex items-center gap-4 mt-5 text-[12px] text-[var(--text-muted)]">
+        <span>JPEG</span>
+        <span className="w-px h-3 bg-[var(--border)]" />
+        <span>PNG</span>
+        <span className="w-px h-3 bg-[var(--border)]" />
+        <span>WebP</span>
+      </div>
+
+      {/* Workflow hint */}
+      <div className="mt-8 flex items-center gap-6 text-[11px] text-[var(--text-muted)]">
+        <span>Upload</span>
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M2 6h8M7 3l3 3-3 3" /></svg>
+        <span>Auto-Crop</span>
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M2 6h8M7 3l3 3-3 3" /></svg>
+        <span>Filter</span>
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M2 6h8M7 3l3 3-3 3" /></svg>
+        <span>Export</span>
+      </div>
     </div>
   );
 }
