@@ -437,6 +437,21 @@ export default function CropPreview({
     }
   }, [handleEraserMouseUp]);
 
+  // Build a circular cursor matching the brush size in display coordinates
+  const brushCursor = (() => {
+    if (!eraserActive || eraserTool !== "brush") return "crosshair";
+    const info = scaleInfoRef.current;
+    if (!info) return "crosshair";
+    const canvas = canvasRef.current;
+    if (!canvas) return "crosshair";
+    const displayScale = canvas.getBoundingClientRect().width / info.srcW;
+    const r = Math.max(2, Math.round(brushSize * displayScale));
+    const size = r * 2 + 2;
+    const half = size / 2;
+    const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='${size}' height='${size}'><circle cx='${half}' cy='${half}' r='${r}' fill='none' stroke='white' stroke-width='1.5'/><circle cx='${half}' cy='${half}' r='${r}' fill='none' stroke='black' stroke-width='0.5'/></svg>`;
+    return `url("data:image/svg+xml,${encodeURIComponent(svg)}") ${half} ${half}, crosshair`;
+  })();
+
   if (!selectedImage || selectedImage.status !== "ready") {
     return (
       <div className="flex-1 flex items-center justify-center">
@@ -457,7 +472,7 @@ export default function CropPreview({
       onMouseDown={eraserActive ? handleEraserMouseDown : undefined}
       onMouseUp={eraserActive ? handleEraserMouseUp : undefined}
       onMouseLeave={handleMouseLeave}
-      style={{ cursor: eraserActive ? "crosshair" : undefined }}
+      style={{ cursor: eraserActive ? brushCursor : undefined }}
     >
       <canvas ref={canvasRef} />
       {/* Lasso overlay */}
