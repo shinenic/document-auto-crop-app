@@ -120,12 +120,16 @@ export default function SortModal({ onClose }: { onClose: () => void }) {
     const { active, over } = event;
     if (over && active.id !== over.id) {
       setOrderedIds((ids) => {
-        const oldIndex = ids.indexOf(active.id as string);
-        const newIndex = ids.indexOf(over.id as string);
-        return arrayMove(ids, oldIndex, newIndex);
+        const newIds = arrayMove(
+          ids,
+          ids.indexOf(active.id as string),
+          ids.indexOf(over.id as string),
+        );
+        dispatch({ type: "REORDER_IMAGES", orderedIds: newIds });
+        return newIds;
       });
     }
-  }, []);
+  }, [dispatch]);
 
   const handleRemove = useCallback(
     (id: string) => {
@@ -134,11 +138,6 @@ export default function SortModal({ onClose }: { onClose: () => void }) {
     },
     [dispatch],
   );
-
-  const handleApply = useCallback(() => {
-    dispatch({ type: "REORDER_IMAGES", orderedIds });
-    onClose();
-  }, [dispatch, orderedIds, onClose]);
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
@@ -204,21 +203,6 @@ export default function SortModal({ onClose }: { onClose: () => void }) {
           </DndContext>
         </div>
 
-        {/* Footer */}
-        <div className="flex justify-end gap-2 px-4 py-3 border-t border-[var(--border)]">
-          <button
-            className="px-3 py-1.5 text-xs font-medium rounded-lg bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] transition-colors"
-            onClick={onClose}
-          >
-            Cancel
-          </button>
-          <button
-            className="px-3 py-1.5 text-xs font-medium rounded-lg bg-[var(--accent)] text-[var(--bg-primary)] hover:bg-[var(--accent-hover)] transition-colors"
-            onClick={handleApply}
-          >
-            Apply
-          </button>
-        </div>
       </div>
     </div>
   );
