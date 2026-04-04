@@ -4,7 +4,7 @@ import { useRef, useEffect, useCallback, useState } from "react";
 import { useApp } from "../context/AppContext";
 import { rotateCanvas } from "../lib/crop";
 
-const LOUPE_CSS = 180;
+const LOUPE_CSS = 260;
 const LOUPE_ZOOM = 2.5;
 const LOUPE_OFFSET = 24;
 
