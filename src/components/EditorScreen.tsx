@@ -29,6 +29,25 @@ export default function EditorScreen() {
   const [sidebarWidth, setSidebarWidth] = useState(112); // w-28 = 112px
   const resizingRef = useRef(false);
 
+  const [eraserActive, setEraserActive] = useState(false);
+  const [eraserTool, setEraserTool] = useState<"brush" | "lasso">("brush");
+  const [brushSize, setBrushSize] = useState(20);
+
+  // Exit eraser mode when switching images
+  useEffect(() => {
+    setEraserActive(false);
+  }, [state.selectedImageId]);
+
+  // Exit eraser mode on Escape
+  useEffect(() => {
+    if (!eraserActive) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setEraserActive(false);
+    };
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [eraserActive]);
+
   // Recompute full-res crop when editState changes (undo/redo/rotate/toggle)
   const selectedImage = getSelectedImage(state);
   const cropKey = selectedImage?.editState
@@ -243,10 +262,21 @@ export default function EditorScreen() {
                 Crop Preview
               </h4>
             </div>
-            <CropPreview />
+            <CropPreview
+              eraserActive={eraserActive}
+              eraserTool={eraserTool}
+              brushSize={brushSize}
+            />
           </div>
         </div>
-        <ToolPanel />
+        <ToolPanel
+          eraserActive={eraserActive}
+          onToggleEraser={() => setEraserActive((v) => !v)}
+          eraserTool={eraserTool}
+          onSetEraserTool={setEraserTool}
+          brushSize={brushSize}
+          onSetBrushSize={setBrushSize}
+        />
       </div>
       {sortModalOpen && (
         <SortModal onClose={() => setSortModalOpen(false)} />

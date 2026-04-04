@@ -76,7 +76,21 @@ function Slider({
   );
 }
 
-export default function ToolPanel() {
+export default function ToolPanel({
+  eraserActive,
+  onToggleEraser,
+  eraserTool,
+  onSetEraserTool,
+  brushSize,
+  onSetBrushSize,
+}: {
+  eraserActive: boolean;
+  onToggleEraser: () => void;
+  eraserTool: "brush" | "lasso";
+  onSetEraserTool: (tool: "brush" | "lasso") => void;
+  brushSize: number;
+  onSetBrushSize: (size: number) => void;
+}) {
   const { state, dispatch } = useApp();
   const selectedImage = state.images.find(
     (img) => img.id === state.selectedImageId,
@@ -132,6 +146,16 @@ export default function ToolPanel() {
       filterConfig: selectedImage.editState.filterConfig,
     });
   }, [selectedImage, dispatch]);
+
+  const clearEraser = useCallback(() => {
+    if (!id || !selectedImage?.editState) return;
+    dispatch({ type: "PUSH_HISTORY", id });
+    dispatch({
+      type: "SET_EDIT_STATE",
+      id,
+      editState: { ...selectedImage.editState, eraseMask: null },
+    });
+  }, [id, selectedImage, dispatch]);
 
   const otherImageCount = state.images.filter(
     (img) => img.id !== selectedImage?.id && img.editState != null,
@@ -387,6 +411,65 @@ export default function ToolPanel() {
           >
             Apply Filter to All ({otherImageCount})
           </button>
+        </div>
+      )}
+
+      {/* Eraser (only when B&W is active and filteredCanvas exists) */}
+      {isFilterActive && selectedImage?.filteredCanvas && (
+        <div>
+          <h4 className="text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-2">Eraser</h4>
+          <div className="flex flex-col gap-1">
+            <ToolButton
+              label={eraserActive ? "Exit Eraser" : "Eraser"}
+              onClick={onToggleEraser}
+              variant={eraserActive ? "accent" : "default"}
+            />
+            {eraserActive && (
+              <>
+                <div className="flex gap-1">
+                  <button
+                    className={`flex-1 px-2 py-1.5 text-[10px] font-medium rounded-lg transition-colors ${
+                      eraserTool === "brush"
+                        ? "bg-[var(--accent-muted)] text-[var(--accent)]"
+                        : "bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)]"
+                    }`}
+                    onClick={() => onSetEraserTool("brush")}
+                  >
+                    Brush
+                  </button>
+                  <button
+                    className={`flex-1 px-2 py-1.5 text-[10px] font-medium rounded-lg transition-colors ${
+                      eraserTool === "lasso"
+                        ? "bg-[var(--accent-muted)] text-[var(--accent)]"
+                        : "bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)]"
+                    }`}
+                    onClick={() => onSetEraserTool("lasso")}
+                  >
+                    Lasso
+                  </button>
+                </div>
+                {eraserTool === "brush" && (
+                  <Slider
+                    label="Brush Size"
+                    value={brushSize}
+                    min={5}
+                    max={100}
+                    step={1}
+                    disabled={false}
+                    onPointerDown={() => {}}
+                    onChange={onSetBrushSize}
+                  />
+                )}
+                {selectedImage?.editState?.eraseMask && (
+                  <ToolButton
+                    label="Clear Eraser"
+                    onClick={clearEraser}
+                    variant="danger"
+                  />
+                )}
+              </>
+            )}
+          </div>
         </div>
       )}
 

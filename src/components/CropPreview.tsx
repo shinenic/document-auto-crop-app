@@ -40,7 +40,15 @@ function drawProgressive(
   ctx.drawImage(current, 0, 0, dstW, dstH);
 }
 
-export default function CropPreview() {
+export default function CropPreview({
+  eraserActive = false,
+  eraserTool = "brush",
+  brushSize = 20,
+}: {
+  eraserActive?: boolean;
+  eraserTool?: "brush" | "lasso";
+  brushSize?: number;
+} = {}) {
   const { state } = useApp();
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
