@@ -6,7 +6,8 @@ import type { PointSelection } from "../lib/types";
 import { renderMaskOverlay } from "../lib/overlay";
 
 const LOUPE_CSS = 320;
-const LOUPE_ZOOM = 3;
+const LOUPE_ZOOM_CORNER = 3;
+const LOUPE_ZOOM_CP = 1.8;
 
 interface Props {
   onDragStart: () => void;
@@ -93,8 +94,9 @@ export default function QuadEditor({ onDragStart, onDragEnd }: Props) {
     loupe.height = loupePx;
     const ctx = loupe.getContext("2d")!;
     ctx.imageSmoothingEnabled = true;
+    const zoom = selected?.type === "corner" ? LOUPE_ZOOM_CORNER : LOUPE_ZOOM_CP;
     const canvasPerCss = canW / main.clientWidth;
-    const srcSize = (LOUPE_CSS * canvasPerCss) / LOUPE_ZOOM;
+    const srcSize = (LOUPE_CSS * canvasPerCss) / zoom;
     const [cx, cy] = dragPosRef.current;
     ctx.drawImage(main, cx - srcSize / 2, cy - srcSize / 2, srcSize, srcSize, 0, 0, loupePx, loupePx);
     const half = loupePx / 2;
@@ -110,7 +112,7 @@ export default function QuadEditor({ onDragStart, onDragEnd }: Props) {
     ctx.strokeStyle = "rgba(255,255,255,0.3)";
     ctx.lineWidth = 2 * dpr;
     ctx.strokeRect(0, 0, loupePx, loupePx);
-  }, [dragging, canW]);
+  }, [dragging, canW, selected]);
 
   // --- Draw ---
   const draw = useCallback(() => {
