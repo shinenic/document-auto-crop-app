@@ -50,7 +50,7 @@ function SortableItem({
     const canvas = canvasRef.current;
     const source = image.cropCanvas ?? image.originalCanvas;
     if (!canvas || !source) return;
-    const maxDim = 140;
+    const maxDim = 220;
     const scale = Math.min(maxDim / source.width, maxDim / source.height);
     canvas.width = Math.round(source.width * scale);
     canvas.height = Math.round(source.height * scale);
@@ -155,7 +155,7 @@ export default function SortModal({ onClose }: { onClose: () => void }) {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="bg-[var(--bg-secondary)] border border-[var(--border)] rounded-xl w-full max-w-3xl max-h-[85vh] flex flex-col shadow-2xl mx-4">
+      <div className="bg-[var(--bg-secondary)] border border-[var(--border)] rounded-xl w-full max-w-5xl max-h-[85vh] flex flex-col shadow-2xl mx-4">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)]">
           <h3 className="text-sm font-medium text-[var(--text-primary)]">
@@ -185,7 +185,7 @@ export default function SortModal({ onClose }: { onClose: () => void }) {
               items={orderedIds}
               strategy={rectSortingStrategy}
             >
-              <div className="grid grid-cols-[repeat(auto-fill,minmax(130px,1fr))] gap-2">
+              <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-2">
                 {orderedImages.map((img, i) => (
                   <SortableItem
                     key={img.id}
