@@ -33,7 +33,7 @@ export interface FilterConfig {
 }
 
 export const DEFAULT_BINARIZE_CONFIG: BinarizeConfig = {
-  blockRadiusBps: 300,
+  blockRadiusBps: 50,
   contrastOffset: -25,
   upsamplingScale: 200,
 };

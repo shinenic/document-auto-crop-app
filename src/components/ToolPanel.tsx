@@ -508,7 +508,7 @@ export default function ToolPanel({
             <Slider
               label="Block Radius"
               value={filterConfig.binarize.blockRadiusBps}
-              min={50}
+              min={20}
               max={1000}
               step={10}
               disabled={!hasCrop}
