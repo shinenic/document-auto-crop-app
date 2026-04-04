@@ -348,38 +348,36 @@ export default function ToolPanel() {
         </div>
       </div>
 
-      {/* Add Bezier CPs */}
+      {/* Bezier CPs */}
       <div>
-        <h4 className="text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-2">Add Bezier CPs</h4>
+        <h4 className="text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-2">Bezier CPs</h4>
         <div className="flex flex-col gap-1">
           {EDGE_LABELS.map((label, i) => {
             const arc = selectedImage?.editState?.edgeFits[i]?.isArc ?? false;
             return (
-              <ToolButton
-                key={i}
-                label={`${label}: ${arc ? "Curve" : "Line"}`}
-                onClick={() => toggleEdge(i)}
-                disabled={!hasCrop}
-                variant={arc ? "accent" : "default"}
-              />
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Remove Bezier CPs */}
-      <div>
-        <h4 className="text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-2">Remove Bezier CPs</h4>
-        <div className="flex flex-col gap-1">
-          {EDGE_LABELS.map((label, i) => {
-            const arc = selectedImage?.editState?.edgeFits[i]?.isArc ?? false;
-            return (
-              <ToolButton
-                key={i}
-                label={label}
-                onClick={() => removeEdgeCurve(i)}
-                disabled={!hasCrop || !arc}
-              />
+              <div key={i} className="flex items-center gap-1">
+                <span className={`flex-1 text-xs ${arc ? "text-[var(--accent)]" : "text-[var(--text-secondary)]"}`}>
+                  {label}
+                </span>
+                <button
+                  className="w-7 h-7 flex items-center justify-center text-sm font-bold rounded-lg bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] transition-colors disabled:opacity-30 disabled:pointer-events-none"
+                  onClick={() => {
+                    if (!arc) toggleEdge(i);
+                  }}
+                  disabled={!hasCrop || arc}
+                  title={`Add curve to ${label.toLowerCase()} edge`}
+                >
+                  +
+                </button>
+                <button
+                  className="w-7 h-7 flex items-center justify-center text-sm font-bold rounded-lg bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] transition-colors disabled:opacity-30 disabled:pointer-events-none"
+                  onClick={() => removeEdgeCurve(i)}
+                  disabled={!hasCrop || !arc}
+                  title={`Remove curve from ${label.toLowerCase()} edge`}
+                >
+                  −
+                </button>
+              </div>
             );
           })}
         </div>
