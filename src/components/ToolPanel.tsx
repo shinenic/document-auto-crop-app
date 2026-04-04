@@ -117,6 +117,26 @@ export default function ToolPanel() {
     });
   }, [id, selectedImage, dispatch]);
 
+  const batchRotateCW = useCallback(() => {
+    dispatch({ type: "BATCH_ROTATE", rotation: 90 });
+  }, [dispatch]);
+
+  const batchRotateCCW = useCallback(() => {
+    dispatch({ type: "BATCH_ROTATE", rotation: 270 });
+  }, [dispatch]);
+
+  const batchFilter = useCallback(() => {
+    if (!selectedImage?.editState) return;
+    dispatch({
+      type: "BATCH_SET_FILTER",
+      filterConfig: selectedImage.editState.filterConfig,
+    });
+  }, [selectedImage, dispatch]);
+
+  const otherImageCount = state.images.filter(
+    (img) => img.id !== selectedImage?.id && img.editState != null,
+  ).length;
+
   const resetToPrediction = useCallback(() => {
     if (id) dispatch({ type: "RESET_TO_PREDICTION", id });
   }, [id, dispatch]);
@@ -276,6 +296,25 @@ export default function ToolPanel() {
         </div>
       </div>
 
+      {otherImageCount > 0 && hasCrop && (
+        <div className="flex gap-1 -mt-3">
+          <button
+            className="flex-1 px-2 py-1 text-[10px] text-[var(--text-muted)] hover:text-[var(--accent)] transition-colors"
+            onClick={batchRotateCW}
+            title="Rotate all images 90° clockwise"
+          >
+            Rotate All CW
+          </button>
+          <button
+            className="flex-1 px-2 py-1 text-[10px] text-[var(--text-muted)] hover:text-[var(--accent)] transition-colors"
+            onClick={batchRotateCCW}
+            title="Rotate all images 90° counter-clockwise"
+          >
+            Rotate All CCW
+          </button>
+        </div>
+      )}
+
       {/* Filter */}
       <div>
         <h4 className="text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-2">Filter</h4>
@@ -338,6 +377,18 @@ export default function ToolPanel() {
           </div>
         )}
       </div>
+
+      {otherImageCount > 0 && hasCrop && (
+        <div className="-mt-3">
+          <button
+            className="w-full px-2 py-1 text-[10px] text-[var(--text-muted)] hover:text-[var(--accent)] transition-colors"
+            onClick={batchFilter}
+            title="Apply current filter settings to all images"
+          >
+            Apply Filter to All ({otherImageCount})
+          </button>
+        </div>
+      )}
 
       {/* Reset */}
       <div>

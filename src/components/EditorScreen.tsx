@@ -118,6 +118,40 @@ export default function EditorScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filterKey, selectedImage?.cropCanvas, state.selectedImageId]);
 
+  // Recompute filteredCanvas for non-selected images after batch filter
+  useEffect(() => {
+    for (const img of state.images) {
+      if (img.id === state.selectedImageId) continue;
+      if (!img.cropCanvas || !img.editState) continue;
+
+      const { filterConfig } = img.editState;
+      if (filterConfig.type === "none") {
+        if (img.filteredCanvas) {
+          dispatch({
+            type: "UPDATE_IMAGE",
+            id: img.id,
+            updates: { filteredCanvas: null },
+          });
+        }
+        continue;
+      }
+
+      if (!img.filteredCanvas) {
+        applyBinarize(img.cropCanvas, filterConfig.binarize).then(
+          (filteredCanvas) => {
+            dispatch({
+              type: "UPDATE_IMAGE",
+              id: img.id,
+              updates: { filteredCanvas },
+            });
+          },
+          (err) => console.error("Batch binarize failed for", img.id, err),
+        );
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.images.map((img) => img.editState?.filterConfig?.type).join(",")]);
+
   const handleDragStart = useCallback(() => {
     isDraggingRef.current = true;
   }, []);

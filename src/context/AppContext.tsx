@@ -10,6 +10,7 @@ import {
 import type {
   AppState,
   EditState,
+  FilterConfig,
   ImageEntry,
   QuadResult,
 } from "../lib/types";
@@ -30,6 +31,8 @@ export type AppAction =
   | { type: "RESET_TO_PREDICTION"; id: string }
   | { type: "CANCEL_CROP"; id: string }
   | { type: "REORDER_IMAGES"; orderedIds: string[] }
+  | { type: "BATCH_ROTATE"; rotation: 0 | 90 | 180 | 270 }
+  | { type: "BATCH_SET_FILTER"; filterConfig: FilterConfig }
   | { type: "MODEL_LOADING" }
   | { type: "MODEL_LOADED" };
 
@@ -194,6 +197,53 @@ function reducer(state: AppState, action: AppAction): AppState {
       );
       return { ...state, images };
     }
+
+    case "BATCH_ROTATE": {
+      const delta = action.rotation;
+      return {
+        ...state,
+        images: state.images.map((img) => {
+          if (!img.editState) return img;
+          const past = [
+            ...img.history.past,
+            cloneEditState(img.editState),
+          ];
+          if (past.length > MAX_HISTORY) past.shift();
+          return {
+            ...img,
+            editState: {
+              ...img.editState,
+              rotation: ((img.editState.rotation + delta) % 360) as 0 | 90 | 180 | 270,
+            },
+            history: { past, future: [] },
+          };
+        }),
+      };
+    }
+
+    case "BATCH_SET_FILTER":
+      return {
+        ...state,
+        images: state.images.map((img) => {
+          if (!img.editState) return img;
+          const past = [
+            ...img.history.past,
+            cloneEditState(img.editState),
+          ];
+          if (past.length > MAX_HISTORY) past.shift();
+          return {
+            ...img,
+            editState: {
+              ...img.editState,
+              filterConfig: {
+                type: action.filterConfig.type,
+                binarize: { ...action.filterConfig.binarize },
+              },
+            },
+            history: { past, future: [] },
+          };
+        }),
+      };
 
     case "MODEL_LOADING":
       return { ...state, modelLoading: true };
