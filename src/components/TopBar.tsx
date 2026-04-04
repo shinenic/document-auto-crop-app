@@ -17,11 +17,13 @@ function DropdownMenu({
   children,
   disabled = false,
   accent = false,
+  minWidth = 220,
 }: {
   label: string;
   children: React.ReactNode;
   disabled?: boolean;
   accent?: boolean;
+  minWidth?: number;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -54,7 +56,7 @@ function DropdownMenu({
         </svg>
       </button>
       {open && (
-        <div className="absolute right-0 top-full mt-1 min-w-[220px] bg-[var(--bg-elevated)] border border-[var(--border)] rounded-lg shadow-xl z-50 py-1 overflow-hidden"
+        <div className="absolute right-0 top-full mt-1 bg-[var(--bg-elevated)] border border-[var(--border)] rounded-lg shadow-xl z-50 py-1 overflow-hidden" style={{ minWidth }}
           onClick={(e) => {
             // Auto-close when a MenuItem (button) is clicked
             const t = e.target as HTMLElement;
@@ -98,7 +100,7 @@ function MenuDivider() {
 }
 
 function MenuLabel({ children }: { children: React.ReactNode }) {
-  return <div className="px-3 py-1 text-[9px] uppercase tracking-wider text-[var(--text-muted)] font-semibold">{children}</div>;
+  return <div className="px-3 py-1 text-[10px] uppercase tracking-wider text-[var(--text-muted)] font-semibold">{children}</div>;
 }
 
 // --- Main Component ---
@@ -304,7 +306,7 @@ export default function TopBar({ onManageImages }: { onManageImages?: () => void
 
         {/* Batch Operations Menu */}
         {multipleImages && (
-          <DropdownMenu label="Batch">
+          <DropdownMenu label="Batch" minWidth={280}>
             <MenuLabel>Rotate All</MenuLabel>
             <MenuItem label="Rotate All 90° CW" onClick={handleBatchRotateCW} />
             <MenuItem label="Rotate All 90° CCW" onClick={handleBatchRotateCCW} />
@@ -338,7 +340,7 @@ export default function TopBar({ onManageImages }: { onManageImages?: () => void
               {batchFilterType === "binarize" && (
                 <div className="flex flex-col gap-1.5">
                   <label className="flex flex-col gap-0.5">
-                    <div className="flex justify-between text-[10px]">
+                    <div className="flex justify-between text-[11px]">
                       <span className="text-[var(--text-muted)]">Block Radius</span>
                       <span className="font-mono text-[var(--text-secondary)]">{batchBinarize.blockRadiusBps}</span>
                     </div>
@@ -348,7 +350,7 @@ export default function TopBar({ onManageImages }: { onManageImages?: () => void
                     />
                   </label>
                   <label className="flex flex-col gap-0.5">
-                    <div className="flex justify-between text-[10px]">
+                    <div className="flex justify-between text-[11px]">
                       <span className="text-[var(--text-muted)]">Contrast</span>
                       <span className="font-mono text-[var(--text-secondary)]">{batchBinarize.contrastOffset}</span>
                     </div>
@@ -358,7 +360,7 @@ export default function TopBar({ onManageImages }: { onManageImages?: () => void
                     />
                   </label>
                   <label className="flex flex-col gap-0.5">
-                    <div className="flex justify-between text-[10px]">
+                    <div className="flex justify-between text-[11px]">
                       <span className="text-[var(--text-muted)]">Upscale %</span>
                       <span className="font-mono text-[var(--text-secondary)]">{batchBinarize.upsamplingScale}</span>
                     </div>
