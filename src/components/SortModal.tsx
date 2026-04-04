@@ -8,6 +8,8 @@ import {
   PointerSensor,
   useSensor,
   useSensors,
+  DragOverlay,
+  type DragStartEvent,
   type DragEndEvent,
 } from "@dnd-kit/core";
 import {
@@ -115,15 +117,22 @@ export default function SortModal({ onClose }: { onClose: () => void }) {
   const [orderedIds, setOrderedIds] = useState(() =>
     state.images.map((img) => img.id),
   );
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
     }),
   );
 
+  const handleDragStart = useCallback((event: DragStartEvent) => {
+    setActiveId(event.active.id as string);
+  }, []);
+
   const handleDragEnd = useCallback((event: DragEndEvent) => {
+    setActiveId(null);
     const { active, over } = event;
     if (over && active.id !== over.id) {
       const oldIndex = orderedIds.indexOf(active.id as string);
@@ -187,11 +196,14 @@ export default function SortModal({ onClose }: { onClose: () => void }) {
         </div>
 
         {/* Grid */}
-        <div className="flex-1 overflow-y-auto p-4">
+        <div ref={scrollRef} className="flex-1 overflow-y-auto p-4">
           <DndContext
             sensors={sensors}
             collisionDetection={closestCenter}
+            onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}
+            onDragCancel={() => setActiveId(null)}
+            autoScroll={{ layoutShiftCompensation: false, acceleration: 15, interval: 10 }}
           >
             <SortableContext
               items={orderedIds}
@@ -208,6 +220,26 @@ export default function SortModal({ onClose }: { onClose: () => void }) {
                 ))}
               </div>
             </SortableContext>
+            <DragOverlay dropAnimation={null}>
+              {activeId ? (() => {
+                const idx = orderedIds.indexOf(activeId);
+                const img = idMap.get(activeId);
+                if (!img) return null;
+                return (
+                  <div className="rounded-lg bg-[var(--bg-elevated)] shadow-2xl opacity-90 border border-[var(--accent)]/40 overflow-hidden" style={{ width: 220 }}>
+                    <div className="absolute top-1.5 left-1.5 z-10 w-5 h-5 rounded-full bg-black/60 flex items-center justify-center">
+                      <span className="text-[10px] font-mono text-white">{idx + 1}</span>
+                    </div>
+                    <div className="flex items-center justify-center p-1" style={{ minHeight: 200 }}>
+                      <canvas className="max-w-full max-h-full object-contain" />
+                    </div>
+                    <div className="px-2 pb-2">
+                      <p className="text-[10px] text-[var(--text-muted)] truncate">{img.fileName}</p>
+                    </div>
+                  </div>
+                );
+              })() : null}
+            </DragOverlay>
           </DndContext>
         </div>
 
