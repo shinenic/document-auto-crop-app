@@ -26,7 +26,7 @@ export default function EditorScreen() {
 
   useKeyboardShortcuts();
   const [sortModalOpen, setSortModalOpen] = useState(false);
-  const [sidebarWidth, setSidebarWidth] = useState(112); // w-28 = 112px
+  const [sidebarWidth, setSidebarWidth] = useState(200);
   const resizingRef = useRef(false);
 
   const [eraserActive, setEraserActive] = useState(false);
@@ -281,7 +281,7 @@ export default function EditorScreen() {
 
     const onMove = (ev: PointerEvent) => {
       const delta = ev.clientX - startX;
-      setSidebarWidth(Math.max(80, Math.min(300, startW + delta)));
+      setSidebarWidth(Math.max(100, Math.min(480, startW + delta)));
     };
 
     const onUp = () => {
