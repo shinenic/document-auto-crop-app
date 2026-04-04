@@ -7,8 +7,8 @@ import { processImages } from "./imageProcessor";
 import { rotateCanvas } from "../lib/crop";
 import { exportPdf } from "../lib/pdfExport";
 import { applyEraseMask } from "../lib/eraser";
-import { PDF_PAGE_SIZES, detectBestPageSize } from "../lib/types";
-import type { PdfPageSize } from "../lib/types";
+import { PDF_PAGE_SIZES, detectBestPageSize, DEFAULT_BINARIZE_CONFIG } from "../lib/types";
+import type { PdfPageSize, FilterConfig, BinarizeConfig } from "../lib/types";
 
 // --- Dropdown Menu Component ---
 
@@ -220,7 +220,6 @@ export default function TopBar({ onManageImages }: { onManageImages?: () => void
     }
   }, [state.images, pdfPageSize, customW, customH]);
 
-  const selectedImage = state.images.find((img) => img.id === state.selectedImageId);
   const multipleImages = state.images.filter((img) => img.editState != null).length > 1;
 
   const handleBatchRotateCW = useCallback(() => {
@@ -231,13 +230,16 @@ export default function TopBar({ onManageImages }: { onManageImages?: () => void
     dispatch({ type: "BATCH_ROTATE", rotation: 270 });
   }, [dispatch]);
 
+  const [batchFilterType, setBatchFilterType] = useState<FilterConfig["type"]>("binarize");
+  const [batchBinarize, setBatchBinarize] = useState<BinarizeConfig>({ ...DEFAULT_BINARIZE_CONFIG });
+
   const handleBatchFilter = useCallback(() => {
-    if (!selectedImage?.editState) return;
-    dispatch({
-      type: "BATCH_SET_FILTER",
-      filterConfig: selectedImage.editState.filterConfig,
-    });
-  }, [selectedImage, dispatch]);
+    const filterConfig: FilterConfig = {
+      type: batchFilterType,
+      binarize: { ...batchBinarize },
+    };
+    dispatch({ type: "BATCH_SET_FILTER", filterConfig });
+  }, [batchFilterType, batchBinarize, dispatch]);
 
   const readyCount = state.images.filter(
     (img) => img.status === "ready" && img.cropCanvas,
@@ -282,12 +284,73 @@ export default function TopBar({ onManageImages }: { onManageImages?: () => void
             <MenuItem label="Rotate All 90° CW" onClick={handleBatchRotateCW} />
             <MenuItem label="Rotate All 90° CCW" onClick={handleBatchRotateCCW} />
             <MenuDivider />
-            <MenuLabel>Filter</MenuLabel>
-            <MenuItem
-              label="Apply Current Filter to All"
-              onClick={handleBatchFilter}
-              disabled={!selectedImage?.editState}
-            />
+            <MenuLabel>Apply Filter to All</MenuLabel>
+            <div className="px-3 py-1.5 flex flex-col gap-2">
+              {/* Filter type toggle */}
+              <div className="flex rounded-md overflow-hidden border border-[var(--border)]">
+                <button
+                  className={`flex-1 px-2 py-1.5 text-[11px] font-medium transition-colors ${
+                    batchFilterType === "none"
+                      ? "bg-[var(--bg-tertiary)] text-[var(--text-primary)]"
+                      : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+                  }`}
+                  onClick={() => setBatchFilterType("none")}
+                >
+                  Original
+                </button>
+                <button
+                  className={`flex-1 px-2 py-1.5 text-[11px] font-medium transition-colors ${
+                    batchFilterType === "binarize"
+                      ? "bg-[var(--accent-muted)] text-[var(--accent)]"
+                      : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+                  }`}
+                  onClick={() => setBatchFilterType("binarize")}
+                >
+                  B&W
+                </button>
+              </div>
+              {/* B&W parameters */}
+              {batchFilterType === "binarize" && (
+                <div className="flex flex-col gap-1.5">
+                  <label className="flex flex-col gap-0.5">
+                    <div className="flex justify-between text-[10px]">
+                      <span className="text-[var(--text-muted)]">Block Radius</span>
+                      <span className="font-mono text-[var(--text-secondary)]">{batchBinarize.blockRadiusBps}</span>
+                    </div>
+                    <input type="range" min={20} max={1000} step={10} value={batchBinarize.blockRadiusBps}
+                      className="w-full h-3"
+                      onChange={(e) => setBatchBinarize((prev) => ({ ...prev, blockRadiusBps: Number(e.target.value) }))}
+                    />
+                  </label>
+                  <label className="flex flex-col gap-0.5">
+                    <div className="flex justify-between text-[10px]">
+                      <span className="text-[var(--text-muted)]">Contrast</span>
+                      <span className="font-mono text-[var(--text-secondary)]">{batchBinarize.contrastOffset}</span>
+                    </div>
+                    <input type="range" min={-50} max={10} step={1} value={batchBinarize.contrastOffset}
+                      className="w-full h-3"
+                      onChange={(e) => setBatchBinarize((prev) => ({ ...prev, contrastOffset: Number(e.target.value) }))}
+                    />
+                  </label>
+                  <label className="flex flex-col gap-0.5">
+                    <div className="flex justify-between text-[10px]">
+                      <span className="text-[var(--text-muted)]">Upscale %</span>
+                      <span className="font-mono text-[var(--text-secondary)]">{batchBinarize.upsamplingScale}</span>
+                    </div>
+                    <input type="range" min={100} max={400} step={25} value={batchBinarize.upsamplingScale}
+                      className="w-full h-3"
+                      onChange={(e) => setBatchBinarize((prev) => ({ ...prev, upsamplingScale: Number(e.target.value) }))}
+                    />
+                  </label>
+                </div>
+              )}
+              <button
+                className="w-full px-3 py-1.5 text-xs font-medium rounded-md bg-[var(--accent)] text-[var(--bg-primary)] hover:bg-[var(--accent-hover)] transition-colors"
+                onClick={handleBatchFilter}
+              >
+                Apply to All Images
+              </button>
+            </div>
           </DropdownMenu>
         )}
 
