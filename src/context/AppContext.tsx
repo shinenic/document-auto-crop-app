@@ -29,6 +29,7 @@ export type AppAction =
   | { type: "REDO"; id: string }
   | { type: "RESET_TO_PREDICTION"; id: string }
   | { type: "CANCEL_CROP"; id: string }
+  | { type: "REORDER_IMAGES"; orderedIds: string[] }
   | { type: "MODEL_LOADING" }
   | { type: "MODEL_LOADED" };
 
@@ -185,6 +186,14 @@ function reducer(state: AppState, action: AppAction): AppState {
           };
         }),
       };
+
+    case "REORDER_IMAGES": {
+      const idOrder = new Map(action.orderedIds.map((id, i) => [id, i]));
+      const images = [...state.images].sort(
+        (a, b) => (idOrder.get(a.id) ?? 0) - (idOrder.get(b.id) ?? 0),
+      );
+      return { ...state, images };
+    }
 
     case "MODEL_LOADING":
       return { ...state, modelLoading: true };

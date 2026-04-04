@@ -108,7 +108,7 @@ export default function ImageList() {
   const { state } = useApp();
 
   return (
-    <div className="w-28 flex-shrink-0 bg-[var(--bg-secondary)] border-r border-[var(--border)] overflow-y-auto p-2 flex flex-col gap-1">
+    <div className="flex-1 bg-[var(--bg-secondary)] border-r border-[var(--border)] overflow-y-auto p-2 flex flex-col gap-1">
       {state.images.map((img) => (
         <Thumbnail
           key={img.id}

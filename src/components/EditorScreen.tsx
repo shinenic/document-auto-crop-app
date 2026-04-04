@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useRef, useEffect } from "react";
+import { useCallback, useRef, useEffect, useState } from "react";
 import TopBar from "./TopBar";
 import ImageList from "./ImageList";
+import SortModal from "./SortModal";
 import QuadEditor from "./QuadEditor";
 import CropPreview from "./CropPreview";
 import ToolPanel from "./ToolPanel";
@@ -24,6 +25,7 @@ export default function EditorScreen() {
   stateRef.current = state;
 
   useKeyboardShortcuts();
+  const [sortModalOpen, setSortModalOpen] = useState(false);
 
   // Recompute full-res crop when editState changes (undo/redo/rotate/toggle)
   const selectedImage = getSelectedImage(state);
@@ -154,7 +156,18 @@ export default function EditorScreen() {
     <div className="h-dvh flex flex-col">
       <TopBar />
       <div className="flex-1 flex min-h-0">
-        <ImageList />
+        <div className="w-28 flex flex-col flex-shrink-0">
+          <ImageList />
+          <div className="bg-[var(--bg-secondary)] border-r border-t border-[var(--border)] p-2">
+            <button
+              className="w-full px-2 py-1.5 text-[10px] font-medium rounded-lg bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] transition-colors disabled:opacity-30"
+              onClick={() => setSortModalOpen(true)}
+              disabled={state.images.length < 2}
+            >
+              Reorder
+            </button>
+          </div>
+        </div>
         <div className="flex-1 flex min-w-0">
           <div className="flex-1 border-r border-[var(--border)] flex flex-col min-w-0">
             <div className="px-3 py-2 border-b border-[var(--border)]">
@@ -178,6 +191,9 @@ export default function EditorScreen() {
         </div>
         <ToolPanel />
       </div>
+      {sortModalOpen && (
+        <SortModal onClose={() => setSortModalOpen(false)} />
+      )}
     </div>
   );
 }
