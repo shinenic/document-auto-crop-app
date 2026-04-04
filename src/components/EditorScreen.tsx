@@ -26,6 +26,8 @@ export default function EditorScreen() {
 
   useKeyboardShortcuts();
   const [sortModalOpen, setSortModalOpen] = useState(false);
+  const [sidebarWidth, setSidebarWidth] = useState(112); // w-28 = 112px
+  const resizingRef = useRef(false);
 
   // Recompute full-res crop when editState changes (undo/redo/rotate/toggle)
   const selectedImage = getSelectedImage(state);
@@ -152,13 +154,38 @@ export default function EditorScreen() {
     });
   }, [dispatch]);
 
+  const handleResizePointerDown = useCallback((e: React.PointerEvent) => {
+    e.preventDefault();
+    resizingRef.current = true;
+    const startX = e.clientX;
+    const startW = sidebarWidth;
+
+    const onMove = (ev: PointerEvent) => {
+      const delta = ev.clientX - startX;
+      setSidebarWidth(Math.max(80, Math.min(300, startW + delta)));
+    };
+
+    const onUp = () => {
+      resizingRef.current = false;
+      document.removeEventListener("pointermove", onMove);
+      document.removeEventListener("pointerup", onUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+
+    document.addEventListener("pointermove", onMove);
+    document.addEventListener("pointerup", onUp);
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+  }, [sidebarWidth]);
+
   return (
     <div className="h-dvh flex flex-col">
       <TopBar />
       <div className="flex-1 flex min-h-0">
-        <div className="w-28 flex flex-col flex-shrink-0">
+        <div className="flex flex-col flex-shrink-0 relative border-r border-[var(--border)]" style={{ width: sidebarWidth }}>
           <ImageList />
-          <div className="bg-[var(--bg-secondary)] border-r border-t border-[var(--border)] p-2">
+          <div className="bg-[var(--bg-secondary)] border-t border-[var(--border)] p-2">
             <button
               className="w-full px-2 py-1.5 text-[10px] font-medium rounded-lg bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] transition-colors disabled:opacity-30"
               onClick={() => setSortModalOpen(true)}
@@ -167,6 +194,11 @@ export default function EditorScreen() {
               Reorder
             </button>
           </div>
+          {/* Resize handle */}
+          <div
+            className="absolute top-0 right-0 w-1.5 h-full cursor-col-resize hover:bg-[var(--accent)]/30 active:bg-[var(--accent)]/50 transition-colors z-10"
+            onPointerDown={handleResizePointerDown}
+          />
         </div>
         <div className="flex-1 flex min-w-0">
           <div className="flex-1 border-r border-[var(--border)] flex flex-col min-w-0">
