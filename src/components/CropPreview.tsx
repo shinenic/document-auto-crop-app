@@ -81,7 +81,15 @@ export default function CropPreview() {
       ctx.imageSmoothingQuality = "high";
     }
     ctx.drawImage(rotated, 0, 0, canvas.width, canvas.height);
-  }, [selectedImage, containerSize, isBinarized]);
+  }, [
+    selectedImage?.cropCanvas,
+    selectedImage?.filteredCanvas,
+    selectedImage?.editState?.rotation,
+    selectedImage?.editState?.filterConfig?.type,
+    selectedImage?.originalCanvas,
+    containerSize,
+    isBinarized,
+  ]);
 
   useEffect(() => {
     draw();
