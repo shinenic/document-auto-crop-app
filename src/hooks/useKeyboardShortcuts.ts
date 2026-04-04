@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useApp } from "../context/AppContext";
 import { rotateCanvas } from "../lib/crop";
+import { applyEraseMask } from "../lib/eraser";
 
 export function useKeyboardShortcuts() {
   const { state, dispatch } = useApp();
@@ -101,20 +102,26 @@ export function useKeyboardShortcuts() {
       if (meta && !shift && e.key === "s") {
         e.preventDefault();
         if (selectedImage?.cropCanvas) {
+          const filterType = selectedImage.editState?.filterConfig?.type ?? "none";
+          let sourceCanvas =
+            filterType !== "none" && selectedImage.filteredCanvas
+              ? selectedImage.filteredCanvas
+              : selectedImage.cropCanvas;
+          const eraseMask = selectedImage.editState?.eraseMask;
+          if (eraseMask && sourceCanvas && filterType !== "none") {
+            sourceCanvas = applyEraseMask(sourceCanvas, eraseMask);
+          }
           const rotation = selectedImage.editState?.rotation ?? 0;
-          const final = rotateCanvas(
-            selectedImage.cropCanvas,
-            rotation,
-          );
+          const final = rotateCanvas(sourceCanvas, rotation);
           final.toBlob((blob: Blob | null) => {
             if (!blob) return;
             const url = URL.createObjectURL(blob);
             const link = document.createElement("a");
-            link.download = `cropped-${selectedImage.fileName.replace(/\.[^.]+$/, "")}.png`;
+            link.download = `cropped-${selectedImage.fileName.replace(/\.[^.]+$/, "")}.jpg`;
             link.href = url;
             link.click();
             URL.revokeObjectURL(url);
-          }, "image/png");
+          }, "image/jpeg", 0.92);
         }
         return;
       }

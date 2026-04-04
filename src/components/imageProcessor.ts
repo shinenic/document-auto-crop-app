@@ -19,6 +19,7 @@ function createImageEntry(file: File): ImageEntry {
     editState: null,
     history: { past: [], future: [] },
     cropCanvas: null,
+    filteredCanvas: null,
     status: "pending",
   };
 }

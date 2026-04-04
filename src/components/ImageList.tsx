@@ -1,20 +1,33 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useApp } from "../context/AppContext";
+import { rotateCanvas } from "../lib/crop";
+import { drawProgressive } from "../lib/drawProgressive";
+import type { EditState } from "../lib/types";
 
 function Thumbnail({
   id,
   originalCanvas,
+  cropCanvas,
+  filteredCanvas,
+  editState,
   fileName,
   status,
   isSelected,
+  containerWidth,
+  index,
 }: {
   id: string;
   originalCanvas: HTMLCanvasElement | null;
+  cropCanvas: HTMLCanvasElement | null;
+  filteredCanvas: HTMLCanvasElement | null;
+  editState: EditState | null;
   fileName: string;
   status: string;
   isSelected: boolean;
+  containerWidth: number;
+  index: number;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
@@ -28,19 +41,43 @@ function Thumbnail({
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas || !originalCanvas) return;
+    if (!canvas) return;
 
-    const maxDim = 120;
-    const scale = Math.min(
-      maxDim / originalCanvas.width,
-      maxDim / originalCanvas.height,
-    );
-    canvas.width = Math.round(originalCanvas.width * scale);
-    canvas.height = Math.round(originalCanvas.height * scale);
+    let source: HTMLCanvasElement | null = null;
+    let needsRotation = false;
+
+    if (editState && filteredCanvas && editState.filterConfig.type !== "none") {
+      source = filteredCanvas;
+      needsRotation = true;
+    } else if (editState && cropCanvas) {
+      source = cropCanvas;
+      needsRotation = true;
+    } else {
+      source = originalCanvas;
+    }
+
+    if (!source) return;
+
+    const display =
+      needsRotation && editState && editState.rotation !== 0
+        ? rotateCanvas(source, editState.rotation)
+        : source;
+
+    // Scale based on container width with DPR for crisp rendering
+    const dpr = window.devicePixelRatio || 1;
+    const maxW = Math.max(containerWidth - 20, 40);
+    const maxH = maxW * 0.75;
+    const scale = Math.min(maxW / display.width, maxH / display.height);
+    const cssW = Math.round(display.width * scale);
+    const cssH = Math.round(display.height * scale);
+    canvas.width = Math.round(cssW * dpr);
+    canvas.height = Math.round(cssH * dpr);
+    canvas.style.width = `${cssW}px`;
+    canvas.style.height = `${cssH}px`;
 
     const ctx = canvas.getContext("2d")!;
-    ctx.drawImage(originalCanvas, 0, 0, canvas.width, canvas.height);
-  }, [originalCanvas]);
+    drawProgressive(ctx, display, canvas.width, canvas.height);
+  }, [originalCanvas, cropCanvas, filteredCanvas, editState, containerWidth]);
 
   return (
     <button
@@ -56,6 +93,9 @@ function Thumbnail({
       onClick={() => dispatch({ type: "SELECT_IMAGE", id })}
     >
       <div className="relative aspect-[4/3] rounded overflow-hidden bg-[var(--bg-tertiary)] flex items-center justify-center">
+        <div className="absolute top-1 left-1 z-10 w-4 h-4 rounded-full bg-black/60 flex items-center justify-center">
+          <span className="text-[8px] font-mono text-white leading-none">{index + 1}</span>
+        </div>
         {status === "processing" ? (
           <div className="w-5 h-5 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin" />
         ) : status === "error" ? (
@@ -76,17 +116,37 @@ function Thumbnail({
 
 export default function ImageList() {
   const { state } = useApp();
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState(112);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver((entries) => {
+      setContainerWidth(entries[0].contentRect.width);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   return (
-    <div className="w-28 flex-shrink-0 bg-[var(--bg-secondary)] border-r border-[var(--border)] overflow-y-auto p-2 flex flex-col gap-1">
-      {state.images.map((img) => (
+    <div
+      ref={containerRef}
+      className="flex-1 bg-[var(--bg-secondary)] overflow-y-auto p-2 flex flex-col gap-1"
+    >
+      {state.images.map((img, idx) => (
         <Thumbnail
           key={img.id}
           id={img.id}
+          index={idx}
           originalCanvas={img.originalCanvas}
+          cropCanvas={img.cropCanvas}
+          filteredCanvas={img.filteredCanvas}
+          editState={img.editState}
           fileName={img.fileName}
           status={img.status}
           isSelected={img.id === state.selectedImageId}
+          containerWidth={containerWidth}
         />
       ))}
     </div>

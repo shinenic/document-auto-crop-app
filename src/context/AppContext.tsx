@@ -10,9 +10,12 @@ import {
 import type {
   AppState,
   EditState,
+  FilterConfig,
   ImageEntry,
   QuadResult,
 } from "../lib/types";
+import { DEFAULT_FILTER_CONFIG } from "../lib/types";
+import { cloneEraseMask } from "../lib/eraser";
 
 // ─── Actions ────────────────────────────────────────────────────────────────
 
@@ -28,6 +31,9 @@ export type AppAction =
   | { type: "REDO"; id: string }
   | { type: "RESET_TO_PREDICTION"; id: string }
   | { type: "CANCEL_CROP"; id: string }
+  | { type: "REORDER_IMAGES"; orderedIds: string[] }
+  | { type: "BATCH_ROTATE"; rotation: 0 | 90 | 180 | 270 }
+  | { type: "BATCH_SET_FILTER"; filterConfig: FilterConfig }
   | { type: "MODEL_LOADING" }
   | { type: "MODEL_LOADED" };
 
@@ -42,6 +48,11 @@ function cloneEditState(s: EditState): EditState {
       isArc: f.isArc,
     })),
     rotation: s.rotation,
+    filterConfig: {
+      type: s.filterConfig.type,
+      binarize: { ...s.filterConfig.binarize },
+    },
+    eraseMask: s.eraseMask ? cloneEraseMask(s.eraseMask) : null,
   };
 }
 
@@ -54,6 +65,11 @@ export function editStateFromQuad(quad: QuadResult): EditState {
       isArc: f.isArc,
     })),
     rotation: 0,
+    filterConfig: {
+      type: DEFAULT_FILTER_CONFIG.type,
+      binarize: { ...DEFAULT_FILTER_CONFIG.binarize },
+    },
+    eraseMask: null,
   };
 }
 
@@ -89,15 +105,28 @@ function reducer(state: AppState, action: AppAction): AppState {
     case "SELECT_IMAGE":
       return { ...state, selectedImageId: action.id };
 
-    case "SET_EDIT_STATE":
+    case "SET_EDIT_STATE": {
       return {
         ...state,
-        images: state.images.map((img) =>
-          img.id === action.id
-            ? { ...img, editState: action.editState }
-            : img,
-        ),
+        images: state.images.map((img) => {
+          if (img.id !== action.id) return img;
+          let editState = action.editState;
+          // Auto-clear eraseMask when binarize params change
+          if (editState && img.editState && editState.eraseMask) {
+            const oldB = img.editState.filterConfig.binarize;
+            const newB = editState.filterConfig.binarize;
+            if (
+              oldB.blockRadiusBps !== newB.blockRadiusBps ||
+              oldB.contrastOffset !== newB.contrastOffset ||
+              oldB.upsamplingScale !== newB.upsamplingScale
+            ) {
+              editState = { ...editState, eraseMask: null };
+            }
+          }
+          return { ...img, editState };
+        }),
       };
+    }
 
     case "PUSH_HISTORY":
       return {
@@ -171,6 +200,63 @@ function reducer(state: AppState, action: AppAction): AppState {
             ...img,
             editState: null,
             cropCanvas: null,
+            filteredCanvas: null,
+            history: { past, future: [] },
+          };
+        }),
+      };
+
+    case "REORDER_IMAGES": {
+      const idOrder = new Map(action.orderedIds.map((id, i) => [id, i]));
+      const images = [...state.images].sort(
+        (a, b) => (idOrder.get(a.id) ?? 0) - (idOrder.get(b.id) ?? 0),
+      );
+      return { ...state, images };
+    }
+
+    case "BATCH_ROTATE": {
+      const delta = action.rotation;
+      return {
+        ...state,
+        images: state.images.map((img) => {
+          if (!img.editState) return img;
+          const past = [
+            ...img.history.past,
+            cloneEditState(img.editState),
+          ];
+          if (past.length > MAX_HISTORY) past.shift();
+          return {
+            ...img,
+            editState: {
+              ...img.editState,
+              rotation: ((img.editState.rotation + delta) % 360) as 0 | 90 | 180 | 270,
+            },
+            history: { past, future: [] },
+          };
+        }),
+      };
+    }
+
+    case "BATCH_SET_FILTER":
+      return {
+        ...state,
+        images: state.images.map((img) => {
+          if (!img.editState) return img;
+          const past = [
+            ...img.history.past,
+            cloneEditState(img.editState),
+          ];
+          if (past.length > MAX_HISTORY) past.shift();
+          return {
+            ...img,
+            editState: {
+              ...img.editState,
+              filterConfig: {
+                type: action.filterConfig.type,
+                binarize: { ...action.filterConfig.binarize },
+              },
+              eraseMask: null,
+            },
             history: { past, future: [] },
           };
         }),
