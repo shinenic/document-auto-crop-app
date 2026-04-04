@@ -5,11 +5,13 @@ import JSZip from "jszip";
 import { useApp } from "../context/AppContext";
 import { processImages } from "./imageProcessor";
 import { rotateCanvas } from "../lib/crop";
+import { exportPdf } from "../lib/pdfExport";
 
 export default function TopBar() {
   const { state, dispatch } = useApp();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [exporting, setExporting] = useState(false);
+  const [exportingPdf, setExportingPdf] = useState(false);
 
   const handleAddImages = useCallback(
     (files: FileList | File[]) => {
@@ -87,6 +89,23 @@ export default function TopBar() {
     }
   }, [state.images]);
 
+  const handleExportPdf = useCallback(async () => {
+    setExportingPdf(true);
+    try {
+      const pdfBlob = await exportPdf(state.images);
+      const url = URL.createObjectURL(pdfBlob);
+      const link = document.createElement("a");
+      link.download = "cropped-images.pdf";
+      link.href = url;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("PDF export failed:", err);
+    } finally {
+      setExportingPdf(false);
+    }
+  }, [state.images]);
+
   const readyCount = state.images.filter(
     (img) => img.status === "ready" && img.cropCanvas,
   ).length;
@@ -126,6 +145,16 @@ export default function TopBar() {
             <span className="inline-block w-3 h-3 border-2 border-[var(--bg-primary)] border-t-transparent rounded-full animate-spin" />
           )}
           {exporting ? "Exporting..." : `Export All (${readyCount})`}
+        </button>
+        <button
+          className="px-3 py-1.5 text-xs font-medium rounded-lg bg-[var(--accent)] text-[var(--bg-primary)] hover:bg-[var(--accent-hover)] transition-colors disabled:opacity-40 flex items-center gap-1.5"
+          onClick={handleExportPdf}
+          disabled={readyCount === 0 || exportingPdf}
+        >
+          {exportingPdf && (
+            <span className="inline-block w-3 h-3 border-2 border-[var(--bg-primary)] border-t-transparent rounded-full animate-spin" />
+          )}
+          {exportingPdf ? "Exporting..." : `Export PDF (${readyCount})`}
         </button>
         <input
           ref={fileInputRef}
