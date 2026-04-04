@@ -15,13 +15,21 @@ import {
   SortableContext,
   sortableKeyboardCoordinates,
   useSortable,
-  verticalListSortingStrategy,
+  rectSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { useApp } from "../context/AppContext";
 import type { ImageEntry } from "../lib/types";
 
-function SortableItem({ image, index }: { image: ImageEntry; index: number }) {
+function SortableItem({
+  image,
+  index,
+  onRemove,
+}: {
+  image: ImageEntry;
+  index: number;
+  onRemove: (id: string) => void;
+}) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const {
     attributes,
@@ -42,7 +50,7 @@ function SortableItem({ image, index }: { image: ImageEntry; index: number }) {
     const canvas = canvasRef.current;
     const source = image.cropCanvas ?? image.originalCanvas;
     if (!canvas || !source) return;
-    const maxDim = 80;
+    const maxDim = 140;
     const scale = Math.min(maxDim / source.width, maxDim / source.height);
     canvas.width = Math.round(source.width * scale);
     canvas.height = Math.round(source.height * scale);
@@ -54,34 +62,43 @@ function SortableItem({ image, index }: { image: ImageEntry; index: number }) {
     <div
       ref={setNodeRef}
       style={style}
-      className="flex items-center gap-3 px-3 py-2 rounded-lg bg-[var(--bg-tertiary)] hover:bg-[var(--bg-elevated)] transition-colors"
+      className="relative group rounded-lg bg-[var(--bg-tertiary)] hover:bg-[var(--bg-elevated)] transition-colors overflow-hidden cursor-grab active:cursor-grabbing"
+      {...attributes}
+      {...listeners}
     >
+      {/* Index badge */}
+      <div className="absolute top-1.5 left-1.5 z-10 w-5 h-5 rounded-full bg-black/60 flex items-center justify-center">
+        <span className="text-[10px] font-mono text-white">{index + 1}</span>
+      </div>
+
+      {/* Remove button */}
       <button
-        className="cursor-grab active:cursor-grabbing text-[var(--text-muted)] hover:text-[var(--text-secondary)] shrink-0"
-        {...attributes}
-        {...listeners}
+        className="absolute top-1.5 right-1.5 z-10 w-5 h-5 rounded-full bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-[var(--danger)]/80"
+        onClick={(e) => {
+          e.stopPropagation();
+          onRemove(image.id);
+        }}
+        onPointerDown={(e) => e.stopPropagation()}
       >
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-          <circle cx="5" cy="3" r="1.5" />
-          <circle cx="11" cy="3" r="1.5" />
-          <circle cx="5" cy="8" r="1.5" />
-          <circle cx="11" cy="8" r="1.5" />
-          <circle cx="5" cy="13" r="1.5" />
-          <circle cx="11" cy="13" r="1.5" />
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="white">
+          <path d="M2.146 2.146a.5.5 0 0 1 .708 0L5 4.293l2.146-2.147a.5.5 0 0 1 .708.708L5.707 5l2.147 2.146a.5.5 0 0 1-.708.708L5 5.707 2.854 7.854a.5.5 0 0 1-.708-.708L4.293 5 2.146 2.854a.5.5 0 0 1 0-.708z" />
         </svg>
       </button>
-      <span className="text-xs text-[var(--text-muted)] w-6 shrink-0 font-mono">
-        {index + 1}
-      </span>
-      <div className="w-16 h-12 rounded overflow-hidden bg-[var(--bg-secondary)] flex items-center justify-center shrink-0">
-        <canvas ref={canvasRef} className="max-w-full max-h-full object-contain" />
+
+      {/* Thumbnail */}
+      <div className="aspect-[4/3] flex items-center justify-center p-2">
+        <canvas
+          ref={canvasRef}
+          className="max-w-full max-h-full object-contain"
+        />
       </div>
-      <span className="text-xs text-[var(--text-secondary)] truncate flex-1">
-        {image.fileName}
-      </span>
-      <span className="text-[10px] text-[var(--text-muted)] shrink-0">
-        {image.status === "ready" ? "Ready" : image.status}
-      </span>
+
+      {/* Filename */}
+      <div className="px-2 pb-2">
+        <p className="text-[10px] text-[var(--text-muted)] truncate">
+          {image.fileName}
+        </p>
+      </div>
     </div>
   );
 }
@@ -93,24 +110,29 @@ export default function SortModal({ onClose }: { onClose: () => void }) {
   );
 
   const sensors = useSensors(
-    useSensor(PointerSensor),
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
     }),
   );
 
-  const handleDragEnd = useCallback(
-    (event: DragEndEvent) => {
-      const { active, over } = event;
-      if (over && active.id !== over.id) {
-        setOrderedIds((ids) => {
-          const oldIndex = ids.indexOf(active.id as string);
-          const newIndex = ids.indexOf(over.id as string);
-          return arrayMove(ids, oldIndex, newIndex);
-        });
-      }
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      setOrderedIds((ids) => {
+        const oldIndex = ids.indexOf(active.id as string);
+        const newIndex = ids.indexOf(over.id as string);
+        return arrayMove(ids, oldIndex, newIndex);
+      });
+    }
+  }, []);
+
+  const handleRemove = useCallback(
+    (id: string) => {
+      setOrderedIds((ids) => ids.filter((i) => i !== id));
+      dispatch({ type: "REMOVE_IMAGE", id });
     },
-    [],
+    [dispatch],
   );
 
   const handleApply = useCallback(() => {
@@ -118,7 +140,6 @@ export default function SortModal({ onClose }: { onClose: () => void }) {
     onClose();
   }, [dispatch, orderedIds, onClose]);
 
-  // Close on Escape
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -127,7 +148,6 @@ export default function SortModal({ onClose }: { onClose: () => void }) {
     return () => window.removeEventListener("keydown", handleKey);
   }, [onClose]);
 
-  // Build ordered images list
   const idMap = new Map(state.images.map((img) => [img.id, img]));
   const orderedImages = orderedIds
     .map((id) => idMap.get(id))
@@ -140,11 +160,14 @@ export default function SortModal({ onClose }: { onClose: () => void }) {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="bg-[var(--bg-secondary)] border border-[var(--border)] rounded-xl w-full max-w-md max-h-[80vh] flex flex-col shadow-2xl">
+      <div className="bg-[var(--bg-secondary)] border border-[var(--border)] rounded-xl w-full max-w-3xl max-h-[85vh] flex flex-col shadow-2xl mx-4">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)]">
           <h3 className="text-sm font-medium text-[var(--text-primary)]">
-            Reorder Images
+            Manage Images
+            <span className="ml-2 text-[var(--text-muted)] font-normal">
+              {orderedImages.length} image{orderedImages.length !== 1 ? "s" : ""}
+            </span>
           </h3>
           <button
             className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
@@ -156,8 +179,8 @@ export default function SortModal({ onClose }: { onClose: () => void }) {
           </button>
         </div>
 
-        {/* Sortable list */}
-        <div className="flex-1 overflow-y-auto p-3">
+        {/* Grid */}
+        <div className="flex-1 overflow-y-auto p-4">
           <DndContext
             sensors={sensors}
             collisionDetection={closestCenter}
@@ -165,11 +188,16 @@ export default function SortModal({ onClose }: { onClose: () => void }) {
           >
             <SortableContext
               items={orderedIds}
-              strategy={verticalListSortingStrategy}
+              strategy={rectSortingStrategy}
             >
-              <div className="flex flex-col gap-1.5">
+              <div className="grid grid-cols-[repeat(auto-fill,minmax(130px,1fr))] gap-2">
                 {orderedImages.map((img, i) => (
-                  <SortableItem key={img.id} image={img} index={i} />
+                  <SortableItem
+                    key={img.id}
+                    image={img}
+                    index={i}
+                    onRemove={handleRemove}
+                  />
                 ))}
               </div>
             </SortableContext>
@@ -188,7 +216,7 @@ export default function SortModal({ onClose }: { onClose: () => void }) {
             className="px-3 py-1.5 text-xs font-medium rounded-lg bg-[var(--accent)] text-[var(--bg-primary)] hover:bg-[var(--accent-hover)] transition-colors"
             onClick={handleApply}
           >
-            Apply Order
+            Apply
           </button>
         </div>
       </div>

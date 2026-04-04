@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useApp } from "../context/AppContext";
 import { rotateCanvas } from "../lib/crop";
 import type { EditState } from "../lib/types";
@@ -14,6 +14,7 @@ function Thumbnail({
   fileName,
   status,
   isSelected,
+  containerWidth,
 }: {
   id: string;
   originalCanvas: HTMLCanvasElement | null;
@@ -23,6 +24,7 @@ function Thumbnail({
   fileName: string;
   status: string;
   isSelected: boolean;
+  containerWidth: number;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
@@ -38,7 +40,6 @@ function Thumbnail({
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    // Choose source: filtered > crop > original; cancelled crop (editState=null) reverts to original
     let source: HTMLCanvasElement | null = null;
     let needsRotation = false;
 
@@ -54,23 +55,21 @@ function Thumbnail({
 
     if (!source) return;
 
-    // Apply rotation when showing crop/filtered preview
     const display =
       needsRotation && editState && editState.rotation !== 0
         ? rotateCanvas(source, editState.rotation)
         : source;
 
-    const maxDim = 120;
-    const scale = Math.min(
-      maxDim / display.width,
-      maxDim / display.height,
-    );
+    // Scale based on container width (minus padding)
+    const maxW = Math.max(containerWidth - 20, 40); // 20px = 2 * p-2 + 2 * p-1.5
+    const maxH = maxW * 0.75; // 4:3 aspect box
+    const scale = Math.min(maxW / display.width, maxH / display.height);
     canvas.width = Math.round(display.width * scale);
     canvas.height = Math.round(display.height * scale);
 
     const ctx = canvas.getContext("2d")!;
     ctx.drawImage(display, 0, 0, canvas.width, canvas.height);
-  }, [originalCanvas, cropCanvas, filteredCanvas, editState]);
+  }, [originalCanvas, cropCanvas, filteredCanvas, editState, containerWidth]);
 
   return (
     <button
@@ -106,9 +105,24 @@ function Thumbnail({
 
 export default function ImageList() {
   const { state } = useApp();
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState(112);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver((entries) => {
+      setContainerWidth(entries[0].contentRect.width);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   return (
-    <div className="flex-1 bg-[var(--bg-secondary)] overflow-y-auto p-2 flex flex-col gap-1">
+    <div
+      ref={containerRef}
+      className="flex-1 bg-[var(--bg-secondary)] overflow-y-auto p-2 flex flex-col gap-1"
+    >
       {state.images.map((img) => (
         <Thumbnail
           key={img.id}
@@ -120,6 +134,7 @@ export default function ImageList() {
           fileName={img.fileName}
           status={img.status}
           isSelected={img.id === state.selectedImageId}
+          containerWidth={containerWidth}
         />
       ))}
     </div>

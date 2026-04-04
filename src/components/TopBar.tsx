@@ -7,7 +7,7 @@ import { processImages } from "./imageProcessor";
 import { rotateCanvas } from "../lib/crop";
 import { exportPdf } from "../lib/pdfExport";
 
-export default function TopBar() {
+export default function TopBar({ onManageImages }: { onManageImages?: () => void }) {
   const { state, dispatch } = useApp();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [exporting, setExporting] = useState(false);
@@ -129,6 +129,15 @@ export default function TopBar() {
         >
           + Add Images
         </button>
+        {onManageImages && (
+          <button
+            className="px-3 py-1.5 text-xs font-medium rounded-lg bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] transition-colors disabled:opacity-40"
+            onClick={onManageImages}
+            disabled={state.images.length === 0}
+          >
+            Manage Images
+          </button>
+        )}
         <button
           className="px-3 py-1.5 text-xs font-medium rounded-lg bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] transition-colors disabled:opacity-40"
           onClick={handleExport}

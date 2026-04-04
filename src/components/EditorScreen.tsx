@@ -215,19 +215,10 @@ export default function EditorScreen() {
 
   return (
     <div className="h-dvh flex flex-col">
-      <TopBar />
+      <TopBar onManageImages={() => setSortModalOpen(true)} />
       <div className="flex-1 flex min-h-0">
         <div className="flex flex-col flex-shrink-0 relative border-r border-[var(--border)]" style={{ width: sidebarWidth }}>
           <ImageList />
-          <div className="bg-[var(--bg-secondary)] border-t border-[var(--border)] p-2">
-            <button
-              className="w-full px-2 py-1.5 text-[10px] font-medium rounded-lg bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] transition-colors disabled:opacity-30"
-              onClick={() => setSortModalOpen(true)}
-              disabled={state.images.length < 2}
-            >
-              Reorder
-            </button>
-          </div>
           {/* Resize handle */}
           <div
             className="absolute top-0 right-0 w-1.5 h-full cursor-col-resize hover:bg-[var(--accent)]/30 active:bg-[var(--accent)]/50 transition-colors z-10"
