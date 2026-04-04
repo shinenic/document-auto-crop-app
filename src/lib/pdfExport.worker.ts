@@ -48,14 +48,75 @@ type PageDescriptor = JpegPage | BinarizePage;
 interface ExportRequest {
   id: number;
   pages: PageDescriptor[];
+  pageSizeMm?: { widthMm: number; heightMm: number };
 }
 
 // ---------------------------------------------------------------------------
-// PDF sizing: longest side maps to 297 mm (A4 height)
+// PDF sizing
 // ---------------------------------------------------------------------------
 
-function pdfScale(w: number, h: number): number {
-  return ((297 / 25.4) * 72) / Math.max(w, h);
+/** Convert mm to PDF points (1pt = 1/72 inch) */
+function mmToPt(mm: number): number {
+  return (mm / 25.4) * 72;
+}
+
+interface PageLayout {
+  pageW: number;
+  pageH: number;
+  imgX: number;
+  imgY: number;
+  imgDrawW: number;
+  imgDrawH: number;
+}
+
+/**
+ * Compute page dimensions and image placement.
+ * Fixed page size: image is centered with object-contain fit + 5mm margin.
+ * Fit to image (widthMm < 0): longest side maps to 297mm (A4 height).
+ */
+function getPageLayout(
+  imgW: number,
+  imgH: number,
+  pageSizeMm?: { widthMm: number; heightMm: number },
+): PageLayout {
+  if (!pageSizeMm || pageSizeMm.widthMm <= 0) {
+    // Fit to image: longest side = 297mm
+    const scale = ((297 / 25.4) * 72) / Math.max(imgW, imgH);
+    const w = imgW * scale;
+    const h = imgH * scale;
+    return { pageW: w, pageH: h, imgX: 0, imgY: 0, imgDrawW: w, imgDrawH: h };
+  }
+
+  // Fixed page size — auto-detect portrait/landscape based on image aspect
+  const imgAspect = imgW / imgH;
+  let pageWMm = pageSizeMm.widthMm;
+  let pageHMm = pageSizeMm.heightMm;
+
+  // If image is landscape and page is portrait, swap page orientation
+  if (imgAspect > 1 && pageWMm < pageHMm) {
+    [pageWMm, pageHMm] = [pageHMm, pageWMm];
+  }
+  // If image is portrait and page is landscape, swap back
+  if (imgAspect <= 1 && pageWMm > pageHMm) {
+    [pageWMm, pageHMm] = [pageHMm, pageWMm];
+  }
+
+  const pageW = mmToPt(pageWMm);
+  const pageH = mmToPt(pageHMm);
+
+  // Fit image inside page (object-contain) with 5mm margin
+  const margin = mmToPt(5);
+  const availW = pageW - margin * 2;
+  const availH = pageH - margin * 2;
+  const scale = Math.min(availW / imgW, availH / imgH);
+  const imgDrawW = imgW * scale;
+  const imgDrawH = imgH * scale;
+
+  // Center the image
+  const imgX = (pageW - imgDrawW) / 2;
+  const imgY = (pageH - imgDrawH) / 2;
+
+  return { pageW, pageH, imgX, imgY, imgDrawW, imgDrawH };
 }
 
 // ---------------------------------------------------------------------------
@@ -161,7 +222,10 @@ function binarizeToG4(
 // PDF construction
 // ---------------------------------------------------------------------------
 
-async function buildPdf(pages: PageDescriptor[]): Promise<ArrayBuffer> {
+async function buildPdf(
+  pages: PageDescriptor[],
+  pageSizeMm?: { widthMm: number; heightMm: number },
+): Promise<ArrayBuffer> {
   const pdfDoc = await PDFDocument.create();
   const context = pdfDoc.context;
 
@@ -169,11 +233,14 @@ async function buildPdf(pages: PageDescriptor[]): Promise<ArrayBuffer> {
     if (desc.type === "jpeg") {
       // --- JPEG path: use pdf-lib's high-level embedJpg ---
       const jpgImage = await pdfDoc.embedJpg(desc.jpegBytes);
-      const scale = pdfScale(desc.width, desc.height);
-      const pageW = desc.width * scale;
-      const pageH = desc.height * scale;
-      const page = pdfDoc.addPage([pageW, pageH]);
-      page.drawImage(jpgImage, { x: 0, y: 0, width: pageW, height: pageH });
+      const layout = getPageLayout(desc.width, desc.height, pageSizeMm);
+      const page = pdfDoc.addPage([layout.pageW, layout.pageH]);
+      page.drawImage(jpgImage, {
+        x: layout.imgX,
+        y: layout.imgY,
+        width: layout.imgDrawW,
+        height: layout.imgDrawH,
+      });
     } else {
       // --- Binarize path: adaptive threshold -> CCITT G4 -> manual XObject ---
       const { g4Data, width, height } = binarizeToG4(
@@ -185,9 +252,7 @@ async function buildPdf(pages: PageDescriptor[]): Promise<ArrayBuffer> {
         desc.upsamplingScale,
       );
 
-      const scale = pdfScale(width, height);
-      const pageW = width * scale;
-      const pageH = height * scale;
+      const layout = getPageLayout(width, height, pageSizeMm);
 
       // Build the image XObject dictionary
       const imgDict = context.obj({
@@ -212,22 +277,22 @@ async function buildPdf(pages: PageDescriptor[]): Promise<ArrayBuffer> {
       const imgRef = context.register(imgStream);
 
       // Create the page
-      const page = pdfDoc.addPage([pageW, pageH]);
+      const page = pdfDoc.addPage([layout.pageW, layout.pageH]);
 
       // Add the image as an XObject resource on the page
       const imgName = PDFName.of("Img0");
       page.node.setXObject(imgName, imgRef);
 
-      // Build a content stream to draw the image: q W 0 0 H 0 0 cm /Img0 Do Q
+      // Build a content stream to draw the image
       const drawOps = [
         PDFOperator.of(PDFOperatorNames.PushGraphicsState),
         PDFOperator.of(PDFOperatorNames.ConcatTransformationMatrix, [
-          PDFNumber.of(pageW),
+          PDFNumber.of(layout.imgDrawW),
           PDFNumber.of(0),
           PDFNumber.of(0),
-          PDFNumber.of(pageH),
-          PDFNumber.of(0),
-          PDFNumber.of(0),
+          PDFNumber.of(layout.imgDrawH),
+          PDFNumber.of(layout.imgX),
+          PDFNumber.of(layout.imgY),
         ]),
         PDFOperator.of(PDFOperatorNames.DrawObject, [imgName]),
         PDFOperator.of(PDFOperatorNames.PopGraphicsState),
@@ -251,9 +316,9 @@ async function buildPdf(pages: PageDescriptor[]): Promise<ArrayBuffer> {
 // ---------------------------------------------------------------------------
 
 self.onmessage = async (e: MessageEvent<ExportRequest>) => {
-  const { id, pages } = e.data;
+  const { id, pages, pageSizeMm } = e.data;
   try {
-    const data = await buildPdf(pages);
+    const data = await buildPdf(pages, pageSizeMm);
     (self as unknown as Worker).postMessage(
       { ok: true, id, data },
       [data],
