@@ -82,6 +82,7 @@ export default function CropPreview({
   }, [eraserTool, eraserActive]);
 
   const [loupeVisible, setLoupeVisible] = useState(false);
+  const [lassoProcessing, setLassoProcessing] = useState(false);
 
   const selectedImage = state.images.find(
     (img) => img.id === state.selectedImageId,
@@ -406,15 +407,22 @@ export default function CropPreview({
     } else {
       const points = lassoPointsRef.current;
       if (points.length >= 3) {
-        const mask = getOrCreateMask();
-        if (mask) {
-          fillLassoRegion(mask, points);
-          dispatch({
-            type: "SET_EDIT_STATE",
-            id: selectedImage.id,
-            editState: { ...selectedImage.editState, eraseMask: mask },
-          });
-        }
+        setLassoProcessing(true);
+        const imgId = selectedImage.id;
+        const editState = selectedImage.editState;
+        // Defer to next frame so spinner renders before heavy computation
+        requestAnimationFrame(() => {
+          const mask = getOrCreateMask();
+          if (mask) {
+            fillLassoRegion(mask, points);
+            dispatch({
+              type: "SET_EDIT_STATE",
+              id: imgId,
+              editState: { ...editState, eraseMask: mask },
+            });
+          }
+          setLassoProcessing(false);
+        });
       }
       lassoPointsRef.current = [];
       const overlay = overlayRef.current;
@@ -484,6 +492,15 @@ export default function CropPreview({
       style={{ cursor: eraserActive ? brushCursor : undefined }}
     >
       <canvas ref={canvasRef} />
+      {/* Lasso processing spinner */}
+      {lassoProcessing && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black/40 z-20">
+          <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[var(--bg-elevated)] shadow-lg">
+            <div className="w-4 h-4 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin" />
+            <span className="text-xs text-[var(--text-secondary)]">Applying...</span>
+          </div>
+        </div>
+      )}
       {/* Lasso overlay */}
       <canvas
         ref={overlayRef}
