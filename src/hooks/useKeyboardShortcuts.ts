@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useApp } from "../context/AppContext";
 import { rotateCanvas } from "../lib/crop";
+import { applyEraseMask } from "../lib/eraser";
 
 export function useKeyboardShortcuts() {
   const { state, dispatch } = useApp();
@@ -102,10 +103,14 @@ export function useKeyboardShortcuts() {
         e.preventDefault();
         if (selectedImage?.cropCanvas) {
           const filterType = selectedImage.editState?.filterConfig?.type ?? "none";
-          const sourceCanvas =
+          let sourceCanvas =
             filterType !== "none" && selectedImage.filteredCanvas
               ? selectedImage.filteredCanvas
               : selectedImage.cropCanvas;
+          const eraseMask = selectedImage.editState?.eraseMask;
+          if (eraseMask && sourceCanvas && filterType !== "none") {
+            sourceCanvas = applyEraseMask(sourceCanvas, eraseMask);
+          }
           const rotation = selectedImage.editState?.rotation ?? 0;
           const final = rotateCanvas(sourceCanvas, rotation);
           final.toBlob((blob: Blob | null) => {

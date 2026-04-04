@@ -420,7 +420,7 @@ export default function ToolPanel({
           <h4 className="text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-2">Eraser</h4>
           <div className="flex flex-col gap-1">
             <ToolButton
-              label={eraserActive ? "Exit Eraser" : "Eraser"}
+              label={eraserActive ? "Exit Eraser (E)" : "Eraser (E)"}
               onClick={onToggleEraser}
               variant={eraserActive ? "accent" : "default"}
             />
@@ -435,7 +435,7 @@ export default function ToolPanel({
                     }`}
                     onClick={() => onSetEraserTool("brush")}
                   >
-                    Brush
+                    Brush (B)
                   </button>
                   <button
                     className={`flex-1 px-2 py-1.5 text-[10px] font-medium rounded-lg transition-colors ${
@@ -445,12 +445,12 @@ export default function ToolPanel({
                     }`}
                     onClick={() => onSetEraserTool("lasso")}
                   >
-                    Lasso
+                    Lasso (L)
                   </button>
                 </div>
                 {eraserTool === "brush" && (
                   <Slider
-                    label="Brush Size"
+                    label="Brush Size ([ / ])"
                     value={brushSize}
                     min={5}
                     max={100}

@@ -243,8 +243,14 @@ export default function CropPreview({
     const filterType = selectedImage?.editState?.filterConfig?.type ?? "none";
     const rotation = selectedImage?.editState?.rotation ?? 0;
 
-    const sourceCanvas =
+    let sourceCanvas =
       filterType !== "none" && filteredCanvas ? filteredCanvas : cropCanvas;
+
+    // Apply eraseMask BEFORE rotation (mask coords match filteredCanvas space)
+    const eraseMask = selectedImage?.editState?.eraseMask;
+    if (eraseMask && filterType !== "none" && sourceCanvas) {
+      sourceCanvas = applyEraseMask(sourceCanvas, eraseMask);
+    }
 
     const displayCanvas = sourceCanvas ?? selectedImage?.originalCanvas ?? null;
 
@@ -287,16 +293,6 @@ export default function CropPreview({
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     drawProgressive(ctx, rotated, canvas.width, canvas.height);
-
-    // Apply eraseMask overlay
-    const eraseMask = selectedImage?.editState?.eraseMask;
-    if (eraseMask && filterType !== "none" && filteredCanvas) {
-      const source = rotated instanceof HTMLCanvasElement ? rotated : displayCanvas;
-      const applied = applyEraseMask(source, eraseMask);
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      drawProgressive(ctx, applied, canvas.width, canvas.height);
-      sourceRef.current = applied;
-    }
   }, [
     selectedImage?.cropCanvas,
     selectedImage?.filteredCanvas,
