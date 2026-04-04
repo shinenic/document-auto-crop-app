@@ -54,7 +54,15 @@ function DropdownMenu({
         </svg>
       </button>
       {open && (
-        <div className="absolute right-0 top-full mt-1 min-w-[220px] bg-[var(--bg-elevated)] border border-[var(--border)] rounded-lg shadow-xl z-50 py-1 overflow-hidden">
+        <div className="absolute right-0 top-full mt-1 min-w-[220px] bg-[var(--bg-elevated)] border border-[var(--border)] rounded-lg shadow-xl z-50 py-1 overflow-hidden"
+          onClick={(e) => {
+            // Auto-close when a MenuItem (button) is clicked
+            const t = e.target as HTMLElement;
+            if (t.closest("button:not(:disabled)") && !t.closest("select") && !t.closest("input")) {
+              setTimeout(() => setOpen(false), 100);
+            }
+          }}
+        >
           {children}
         </div>
       )}
@@ -103,6 +111,14 @@ export default function TopBar({ onManageImages }: { onManageImages?: () => void
   const [pdfPageSize, setPdfPageSize] = useState<PdfPageSize>(PDF_PAGE_SIZES[0]);
   const [customW, setCustomW] = useState(210);
   const [customH, setCustomH] = useState(297);
+  const [toast, setToast] = useState<string | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showToast = useCallback((msg: string) => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    setToast(msg);
+    toastTimer.current = setTimeout(() => setToast(null), 3000);
+  }, []);
 
   const handleAddImages = useCallback(
     (files: FileList | File[]) => {
@@ -144,6 +160,8 @@ export default function TopBar({ onManageImages }: { onManageImages?: () => void
       link.href = url;
       link.click();
       URL.revokeObjectURL(url);
+      const kb = Math.round(blob.size / 1024);
+      showToast(`JPEG exported (${kb} KB)`);
     }, "image/jpeg", 0.92);
   }, [state.images, state.selectedImageId]);
 
@@ -185,10 +203,13 @@ export default function TopBar({ onManageImages }: { onManageImages?: () => void
       link.href = url;
       link.click();
       URL.revokeObjectURL(url);
+      const count = zip.filter(() => true).length;
+      const mb = (zipBlob.size / (1024 * 1024)).toFixed(1);
+      showToast(`ZIP exported (${count} images, ${mb} MB)`);
     } finally {
       setExporting(false);
     }
-  }, [state.images]);
+  }, [state.images, showToast]);
 
   const handleExportPdf = useCallback(async () => {
     setExportingPdf(true);
@@ -213,8 +234,12 @@ export default function TopBar({ onManageImages }: { onManageImages?: () => void
       link.href = url;
       link.click();
       URL.revokeObjectURL(url);
+      const pages = state.images.filter((img) => img.status === "ready" && img.cropCanvas && img.editState).length;
+      const mb = (pdfBlob.size / (1024 * 1024)).toFixed(1);
+      showToast(`PDF exported (${pages} page${pages !== 1 ? "s" : ""}, ${mb} MB)`);
     } catch (err) {
       console.error("PDF export failed:", err);
+      showToast("PDF export failed");
     } finally {
       setExportingPdf(false);
     }
@@ -246,7 +271,7 @@ export default function TopBar({ onManageImages }: { onManageImages?: () => void
   ).length;
 
   return (
-    <div className="h-11 flex items-center justify-between px-3 bg-[var(--bg-secondary)] border-b border-[var(--border)]">
+    <div className="h-11 flex items-center justify-between px-3 bg-[var(--bg-secondary)] border-b border-[var(--border)] relative">
       <div className="flex items-center gap-3">
         <span className="text-sm font-semibold text-[var(--text-primary)]">
           Document Auto-Crop
@@ -427,6 +452,13 @@ export default function TopBar({ onManageImages }: { onManageImages?: () => void
           }
         />
       </div>
+
+      {/* Toast notification */}
+      {toast && (
+        <div className="absolute left-1/2 -translate-x-1/2 bottom-0 translate-y-[calc(100%+8px)] z-50 px-4 py-2 rounded-lg bg-[var(--bg-elevated)] border border-[var(--border)] shadow-lg text-[12px] text-[var(--text-primary)] animate-[fadeInUp_0.2s_ease-out]">
+          {toast}
+        </div>
+      )}
     </div>
   );
 }

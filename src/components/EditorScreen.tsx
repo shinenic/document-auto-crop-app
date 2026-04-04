@@ -32,6 +32,7 @@ export default function EditorScreen() {
   const [eraserActive, setEraserActive] = useState(false);
   const [eraserTool, setEraserTool] = useState<"brush" | "lasso">("brush");
   const [brushSize, setBrushSize] = useState(20);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
 
   // Exit eraser mode when switching images
   useEffect(() => {
@@ -48,9 +49,14 @@ export default function EditorScreen() {
       const img = getSelectedImage(stateRef.current);
       const isBW = img?.editState?.filterConfig?.type === "binarize" && !!img.filteredCanvas;
 
-      if (e.key === "Escape" && eraserActive) {
+      if (e.key === "?" || (e.shiftKey && e.key === "/")) {
         e.preventDefault();
-        setEraserActive(false);
+        setShortcutsOpen((v) => !v);
+        return;
+      }
+      if (e.key === "Escape") {
+        if (shortcutsOpen) { setShortcutsOpen(false); return; }
+        if (eraserActive) { setEraserActive(false); return; }
         return;
       }
       if (e.key.toLowerCase() === "e" && isBW) {
@@ -83,7 +89,7 @@ export default function EditorScreen() {
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [eraserActive]);
+  }, [eraserActive, shortcutsOpen]);
 
   const selectedImage = getSelectedImage(state);
 
@@ -350,6 +356,36 @@ export default function EditorScreen() {
       </div>
       {sortModalOpen && (
         <SortModal onClose={() => setSortModalOpen(false)} />
+      )}
+
+      {/* Keyboard shortcuts overlay */}
+      {shortcutsOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShortcutsOpen(false)}>
+          <div className="bg-[var(--bg-secondary)] border border-[var(--border)] rounded-xl shadow-2xl p-5 max-w-sm w-full mx-4" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-[13px] font-semibold text-[var(--text-primary)]">Keyboard Shortcuts</h3>
+              <kbd className="text-[10px] text-[var(--text-muted)] font-mono bg-[var(--bg-tertiary)] px-1.5 py-0.5 rounded">?</kbd>
+            </div>
+            {[
+              { group: "Navigation", keys: [["Arrow Up / Down", "Previous / Next image"], ["Ctrl+S", "Export current JPEG"]] },
+              { group: "Editing", keys: [["Ctrl+Z", "Undo"], ["Ctrl+Shift+Z", "Redo"], ["R", "Rotate 90° CW"], ["Shift+R", "Rotate 90° CCW"]] },
+              { group: "Eraser", keys: [["E", "Toggle eraser mode"], ["B", "Brush tool"], ["L", "Lasso tool"], ["[ / ]", "Brush size -/+"]] },
+            ].map(({ group, keys }) => (
+              <div key={group} className="mb-3 last:mb-0">
+                <h4 className="text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">{group}</h4>
+                <div className="flex flex-col gap-1">
+                  {keys.map(([key, desc]) => (
+                    <div key={key} className="flex items-center justify-between">
+                      <span className="text-[12px] text-[var(--text-secondary)]">{desc}</span>
+                      <kbd className="text-[10px] text-[var(--text-muted)] font-mono bg-[var(--bg-tertiary)] px-1.5 py-0.5 rounded ml-3 shrink-0">{key}</kbd>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+            <p className="text-[10px] text-[var(--text-muted)] mt-3 pt-3 border-t border-[var(--border)]">Press <kbd className="font-mono">?</kbd> or <kbd className="font-mono">Esc</kbd> to close</p>
+          </div>
+        </div>
       )}
     </div>
   );

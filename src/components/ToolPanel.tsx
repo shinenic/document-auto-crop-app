@@ -321,13 +321,13 @@ export default function ToolPanel({
                   <span className="w-12 text-[12px] text-[var(--text-primary)] font-medium shrink-0">{label}</span>
                   <div className="flex flex-1 rounded-md overflow-hidden border border-[var(--border)]">
                     <button
-                      className={`flex-1 flex items-center justify-center gap-1 py-1.5 text-[10px] font-medium transition-colors ${
+                      className={`flex-1 flex items-center justify-center gap-1 py-1.5 text-[11px] font-medium transition-colors ${
                         !arc ? "bg-[var(--bg-elevated)] text-[var(--text-primary)]" : "bg-[var(--bg-tertiary)] text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
                       } disabled:opacity-20 disabled:pointer-events-none`}
                       onClick={() => { if (arc) removeEdgeCurve(i); }} disabled={!hasCrop || !arc}
                     ><IconLine /> Line</button>
                     <button
-                      className={`flex-1 flex items-center justify-center gap-1 py-1.5 text-[10px] font-medium transition-colors ${
+                      className={`flex-1 flex items-center justify-center gap-1 py-1.5 text-[11px] font-medium transition-colors ${
                         arc ? "bg-[var(--accent-muted)] text-[var(--accent)]" : "bg-[var(--bg-tertiary)] text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
                       } disabled:opacity-20 disabled:pointer-events-none`}
                       onClick={() => { if (!arc) toggleEdge(i); }} disabled={!hasCrop || arc}

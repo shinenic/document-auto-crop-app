@@ -225,13 +225,24 @@ export default function SortModal({ onClose }: { onClose: () => void }) {
                 const idx = orderedIds.indexOf(activeId);
                 const img = idMap.get(activeId);
                 if (!img) return null;
+                // Generate a small data URL for the overlay thumbnail
+                const src = img.cropCanvas ?? img.originalCanvas;
+                let dataUrl = "";
+                if (src) {
+                  const tmp = document.createElement("canvas");
+                  const scale = Math.min(200 / src.width, 180 / src.height);
+                  tmp.width = Math.round(src.width * scale);
+                  tmp.height = Math.round(src.height * scale);
+                  const tCtx = tmp.getContext("2d");
+                  if (tCtx) { tCtx.drawImage(src, 0, 0, tmp.width, tmp.height); dataUrl = tmp.toDataURL("image/jpeg", 0.6); }
+                }
                 return (
-                  <div className="rounded-lg bg-[var(--bg-elevated)] shadow-2xl opacity-90 border border-[var(--accent)]/40 overflow-hidden" style={{ width: 220 }}>
+                  <div className="relative rounded-lg bg-[var(--bg-elevated)] shadow-2xl opacity-90 border border-[var(--accent)]/40 overflow-hidden" style={{ width: 220 }}>
                     <div className="absolute top-1.5 left-1.5 z-10 w-5 h-5 rounded-full bg-black/60 flex items-center justify-center">
                       <span className="text-[10px] font-mono text-white">{idx + 1}</span>
                     </div>
-                    <div className="flex items-center justify-center p-1" style={{ minHeight: 200 }}>
-                      <canvas className="max-w-full max-h-full object-contain" />
+                    <div className="flex items-center justify-center p-1" style={{ minHeight: 180 }}>
+                      {dataUrl && <img src={dataUrl} alt="" className="max-w-full max-h-[180px] object-contain" />}
                     </div>
                     <div className="px-2 pb-2">
                       <p className="text-[10px] text-[var(--text-muted)] truncate">{img.fileName}</p>
