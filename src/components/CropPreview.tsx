@@ -1,13 +1,14 @@
 "use client";
 
-import { useRef, useEffect, useState } from "react";
+import { useRef, useEffect, useCallback, useState } from "react";
 import { useApp } from "../context/AppContext";
 import { rotateCanvas } from "../lib/crop";
 
 export default function CropPreview() {
   const { state } = useApp();
-  const [imgSrc, setImgSrc] = useState<string | null>(null);
-  const prevUrlRef = useRef<string | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [containerSize, setContainerSize] = useState<{ w: number; h: number } | null>(null);
 
   const selectedImage = state.images.find(
     (img) => img.id === state.selectedImageId,
@@ -17,65 +18,74 @@ export default function CropPreview() {
     (selectedImage?.editState?.filterConfig?.type ?? "none") !== "none" &&
     !!selectedImage?.filteredCanvas;
 
+  // Track container size
   useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver((entries) => {
+      const { width, height } = entries[0].contentRect;
+      setContainerSize({ w: width, h: height });
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  // Draw source canvas onto display canvas with DPR scaling
+  const draw = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || !containerSize) return;
+
     const cropCanvas = selectedImage?.cropCanvas;
     const filteredCanvas = selectedImage?.filteredCanvas;
     const filterType = selectedImage?.editState?.filterConfig?.type ?? "none";
     const rotation = selectedImage?.editState?.rotation ?? 0;
 
-    // Choose source: filteredCanvas if filter is active AND result is ready
     const sourceCanvas =
       filterType !== "none" && filteredCanvas ? filteredCanvas : cropCanvas;
 
-    // Fallback to original when no crop
     const displayCanvas = sourceCanvas ?? selectedImage?.originalCanvas ?? null;
 
     if (!displayCanvas) {
-      if (prevUrlRef.current) URL.revokeObjectURL(prevUrlRef.current);
-      prevUrlRef.current = null;
-      setImgSrc(null);
+      canvas.width = 0;
+      canvas.height = 0;
       return;
     }
 
-    const rotated = rotation !== 0 && sourceCanvas
-      ? rotateCanvas(sourceCanvas, rotation)
-      : displayCanvas;
+    const rotated =
+      rotation !== 0 && sourceCanvas
+        ? rotateCanvas(sourceCanvas, rotation)
+        : displayCanvas;
 
-    // Convert canvas to blob URL for <img> rendering
-    // Use PNG for binarized (lossless, preserves hard edges), JPEG for photos
-    const mimeType = filterType !== "none" ? "image/png" : "image/jpeg";
-    const quality = filterType !== "none" ? undefined : 0.92;
+    const srcW = rotated.width;
+    const srcH = rotated.height;
 
-    rotated.toBlob(
-      (blob) => {
-        if (!blob) return;
-        if (prevUrlRef.current) URL.revokeObjectURL(prevUrlRef.current);
-        const url = URL.createObjectURL(blob);
-        prevUrlRef.current = url;
-        setImgSrc(url);
-      },
-      mimeType,
-      quality,
-    );
+    // Fit source into container (object-contain logic)
+    const pad = 32; // 16px padding on each side (p-4)
+    const availW = containerSize.w - pad;
+    const availH = containerSize.h - pad;
+    const scale = Math.min(availW / srcW, availH / srcH, 1);
+    const cssW = Math.round(srcW * scale);
+    const cssH = Math.round(srcH * scale);
 
-    // Cleanup on unmount
-    return () => {
-      // Don't revoke here — the next effect run or unmount cleanup handles it
-    };
-  }, [
-    selectedImage?.cropCanvas,
-    selectedImage?.filteredCanvas,
-    selectedImage?.editState?.rotation,
-    selectedImage?.editState?.filterConfig?.type,
-    selectedImage?.originalCanvas,
-  ]);
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.round(cssW * dpr);
+    canvas.height = Math.round(cssH * dpr);
+    canvas.style.width = `${cssW}px`;
+    canvas.style.height = `${cssH}px`;
 
-  // Revoke blob URL on unmount
+    const ctx = canvas.getContext("2d")!;
+    if (isBinarized) {
+      ctx.imageSmoothingEnabled = false;
+    } else {
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
+    }
+    ctx.drawImage(rotated, 0, 0, canvas.width, canvas.height);
+  }, [selectedImage, containerSize, isBinarized]);
+
   useEffect(() => {
-    return () => {
-      if (prevUrlRef.current) URL.revokeObjectURL(prevUrlRef.current);
-    };
-  }, []);
+    draw();
+  }, [draw]);
 
   if (!selectedImage || selectedImage.status !== "ready") {
     return (
@@ -90,17 +100,11 @@ export default function CropPreview() {
   }
 
   return (
-    <div className="flex-1 flex items-center justify-center p-4 bg-[var(--bg-secondary)] overflow-hidden">
-      {imgSrc ? (
-        <img
-          src={imgSrc}
-          alt="Crop preview"
-          className="max-w-full max-h-full object-contain"
-          style={isBinarized ? { imageRendering: "pixelated" } : undefined}
-        />
-      ) : (
-        <p className="text-[var(--text-muted)] text-sm">No preview</p>
-      )}
+    <div
+      ref={containerRef}
+      className="flex-1 flex items-center justify-center p-4 bg-[var(--bg-secondary)] overflow-hidden"
+    >
+      <canvas ref={canvasRef} />
     </div>
   );
 }
