@@ -86,7 +86,7 @@ function SortableItem({
       </button>
 
       {/* Thumbnail */}
-      <div className="flex items-center justify-center p-2" style={{ minHeight: 360 }}>
+      <div className="flex items-center justify-center p-2" style={{ minHeight: 400 }}>
         <canvas
           ref={canvasRef}
           className="max-w-full max-h-full object-contain"
@@ -185,7 +185,7 @@ export default function SortModal({ onClose }: { onClose: () => void }) {
               items={orderedIds}
               strategy={rectSortingStrategy}
             >
-              <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-2">
+              <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] max-w-[960px] mx-auto gap-2">
                 {orderedImages.map((img, i) => (
                   <SortableItem
                     key={img.id}
