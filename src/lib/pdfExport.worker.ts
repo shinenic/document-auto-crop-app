@@ -104,11 +104,8 @@ function getPageLayout(
   const pageW = mmToPt(pageWMm);
   const pageH = mmToPt(pageHMm);
 
-  // Fit image inside page (object-contain) with 5mm margin
-  const margin = mmToPt(5);
-  const availW = pageW - margin * 2;
-  const availH = pageH - margin * 2;
-  const scale = Math.min(availW / imgW, availH / imgH);
+  // Fit image inside page (object-contain, no margin)
+  const scale = Math.min(pageW / imgW, pageH / imgH);
   const imgDrawW = imgW * scale;
   const imgDrawH = imgH * scale;
 
