@@ -111,3 +111,77 @@ export interface PointSelection {
 export const INPUT_SIZE = 256;
 export const EDGE_LABELS = ["Top", "Right", "Bottom", "Left"] as const;
 export const MAX_PREVIEW_SIZE = 800;
+
+// --- PDF Page Sizes ---
+
+export interface PdfPageSize {
+  label: string;
+  widthMm: number;   // 0 = fit to image
+  heightMm: number;  // 0 = fit to image
+}
+
+export const PDF_PAGE_SIZES: PdfPageSize[] = [
+  // Auto-detect
+  { label: "Auto Detect", widthMm: 0, heightMm: 0 },
+  // Music portrait
+  { label: "Music 9×12″", widthMm: 229, heightMm: 305 },
+  { label: "Music Euro", widthMm: 235, heightMm: 310 },
+  { label: "Music Large", widthMm: 240, heightMm: 325 },
+  // Standard portrait
+  { label: "A4", widthMm: 210, heightMm: 297 },
+  { label: "A3", widthMm: 297, heightMm: 420 },
+  { label: "Letter", widthMm: 215.9, heightMm: 279.4 },
+  // Landscape
+  { label: "A4 Landscape", widthMm: 297, heightMm: 210 },
+  { label: "Music 12×9″", widthMm: 305, heightMm: 229 },
+  { label: "A3 Landscape", widthMm: 420, heightMm: 297 },
+  // Fit to image (each page different)
+  { label: "Fit to Image", widthMm: -1, heightMm: -1 },
+];
+
+/**
+ * Find the closest page size based on average image dimensions.
+ * Compares aspect ratio similarity and area proximity.
+ */
+export function detectBestPageSize(
+  images: { width: number; height: number }[],
+): PdfPageSize {
+  if (images.length === 0) return PDF_PAGE_SIZES[1]; // fallback Music 9×12
+
+  // Compute average aspect ratio from cropped images
+  let sumRatio = 0;
+  let sumW = 0;
+  let sumH = 0;
+  for (const img of images) {
+    sumRatio += img.width / img.height;
+    sumW += img.width;
+    sumH += img.height;
+  }
+  const avgRatio = sumRatio / images.length;
+  const avgW = sumW / images.length;
+  const avgH = sumH / images.length;
+
+  // Estimate physical size assuming 300 DPI
+  const avgWMm = (avgW / 300) * 25.4;
+  const avgHMm = (avgH / 300) * 25.4;
+
+  // Score each fixed page size (skip Auto Detect and Fit to Image)
+  let bestScore = Infinity;
+  let best: PdfPageSize = PDF_PAGE_SIZES[1];
+
+  for (const ps of PDF_PAGE_SIZES) {
+    if (ps.widthMm <= 0) continue; // skip auto/fit
+    const psRatio = ps.widthMm / ps.heightMm;
+    const ratioDiff = Math.abs(psRatio - avgRatio) / avgRatio;
+    const sizeDiff =
+      (Math.abs(ps.widthMm - avgWMm) + Math.abs(ps.heightMm - avgHMm)) /
+      (avgWMm + avgHMm);
+    const score = ratioDiff * 2 + sizeDiff; // weight ratio more
+    if (score < bestScore) {
+      bestScore = score;
+      best = ps;
+    }
+  }
+
+  return best;
+}
