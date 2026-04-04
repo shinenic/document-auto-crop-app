@@ -202,7 +202,7 @@ async function buildPdf(pages: PageDescriptor[]): Promise<ArrayBuffer> {
           K: -1,
           Columns: width,
           Rows: height,
-          BlackIs1: true,
+          BlackIs1: false,
         },
         Length: g4Data.length,
       });
