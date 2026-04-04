@@ -2,16 +2,24 @@
 
 import { useEffect, useRef } from "react";
 import { useApp } from "../context/AppContext";
+import { rotateCanvas } from "../lib/crop";
+import type { EditState } from "../lib/types";
 
 function Thumbnail({
   id,
   originalCanvas,
+  cropCanvas,
+  filteredCanvas,
+  editState,
   fileName,
   status,
   isSelected,
 }: {
   id: string;
   originalCanvas: HTMLCanvasElement | null;
+  cropCanvas: HTMLCanvasElement | null;
+  filteredCanvas: HTMLCanvasElement | null;
+  editState: EditState | null;
   fileName: string;
   status: string;
   isSelected: boolean;
@@ -28,19 +36,41 @@ function Thumbnail({
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas || !originalCanvas) return;
+    if (!canvas) return;
+
+    // Choose source: filtered > crop > original; cancelled crop (editState=null) reverts to original
+    let source: HTMLCanvasElement | null = null;
+    let needsRotation = false;
+
+    if (editState && filteredCanvas && editState.filterConfig.type !== "none") {
+      source = filteredCanvas;
+      needsRotation = true;
+    } else if (editState && cropCanvas) {
+      source = cropCanvas;
+      needsRotation = true;
+    } else {
+      source = originalCanvas;
+    }
+
+    if (!source) return;
+
+    // Apply rotation when showing crop/filtered preview
+    const display =
+      needsRotation && editState && editState.rotation !== 0
+        ? rotateCanvas(source, editState.rotation)
+        : source;
 
     const maxDim = 120;
     const scale = Math.min(
-      maxDim / originalCanvas.width,
-      maxDim / originalCanvas.height,
+      maxDim / display.width,
+      maxDim / display.height,
     );
-    canvas.width = Math.round(originalCanvas.width * scale);
-    canvas.height = Math.round(originalCanvas.height * scale);
+    canvas.width = Math.round(display.width * scale);
+    canvas.height = Math.round(display.height * scale);
 
     const ctx = canvas.getContext("2d")!;
-    ctx.drawImage(originalCanvas, 0, 0, canvas.width, canvas.height);
-  }, [originalCanvas]);
+    ctx.drawImage(display, 0, 0, canvas.width, canvas.height);
+  }, [originalCanvas, cropCanvas, filteredCanvas, editState]);
 
   return (
     <button
@@ -84,6 +114,9 @@ export default function ImageList() {
           key={img.id}
           id={img.id}
           originalCanvas={img.originalCanvas}
+          cropCanvas={img.cropCanvas}
+          filteredCanvas={img.filteredCanvas}
+          editState={img.editState}
           fileName={img.fileName}
           status={img.status}
           isSelected={img.id === state.selectedImageId}
