@@ -86,7 +86,7 @@ function SortableItem({
       </button>
 
       {/* Thumbnail */}
-      <div className="aspect-[4/3] flex items-center justify-center p-2">
+      <div className="flex items-center justify-center p-2" style={{ minHeight: 360 }}>
         <canvas
           ref={canvasRef}
           className="max-w-full max-h-full object-contain"
