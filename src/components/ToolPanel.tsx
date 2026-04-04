@@ -276,22 +276,6 @@ export default function ToolPanel({
     });
   }, [id, selectedImage, dispatch]);
 
-  const batchRotateCW = useCallback(() => {
-    dispatch({ type: "BATCH_ROTATE", rotation: 90 });
-  }, [dispatch]);
-
-  const batchRotateCCW = useCallback(() => {
-    dispatch({ type: "BATCH_ROTATE", rotation: 270 });
-  }, [dispatch]);
-
-  const batchFilter = useCallback(() => {
-    if (!selectedImage?.editState) return;
-    if (eraserActive) onToggleEraser();
-    dispatch({
-      type: "BATCH_SET_FILTER",
-      filterConfig: selectedImage.editState.filterConfig,
-    });
-  }, [selectedImage, dispatch, eraserActive, onToggleEraser]);
 
   const clearEraser = useCallback(() => {
     if (!id || !selectedImage?.editState) return;
@@ -303,9 +287,6 @@ export default function ToolPanel({
     });
   }, [id, selectedImage, dispatch]);
 
-  const otherImageCount = state.images.filter(
-    (img) => img.id !== selectedImage?.id && img.editState != null,
-  ).length;
 
   const resetToPrediction = useCallback(() => {
     if (id) dispatch({ type: "RESET_TO_PREDICTION", id });
@@ -464,24 +445,6 @@ export default function ToolPanel({
           <ToolBtn icon={<IconRotateCW />} label="CW" shortcut="R" onClick={rotateCW} disabled={!hasCrop} className="flex-1" />
           <ToolBtn icon={<IconRotateCCW />} label="CCW" shortcut="+R" onClick={rotateCCW} disabled={!hasCrop} className="flex-1" />
         </div>
-        {otherImageCount > 0 && hasCrop && (
-          <div className="flex gap-1 mt-1">
-            <button
-              className="flex-1 px-2 py-1 text-[9px] text-[var(--text-muted)] hover:text-[var(--accent)] transition-colors rounded"
-              onClick={batchRotateCW}
-              title="Rotate all images 90° clockwise"
-            >
-              All CW
-            </button>
-            <button
-              className="flex-1 px-2 py-1 text-[9px] text-[var(--text-muted)] hover:text-[var(--accent)] transition-colors rounded"
-              onClick={batchRotateCCW}
-              title="Rotate all images 90° counter-clockwise"
-            >
-              All CCW
-            </button>
-          </div>
-        )}
       </Section>
 
       <div className="h-px bg-[var(--border)]" />
@@ -573,15 +536,6 @@ export default function ToolPanel({
               onChange={(v) => updateBinarizeConfig({ upsamplingScale: v })}
             />
           </div>
-        )}
-        {otherImageCount > 0 && hasCrop && (
-          <button
-            className="w-full mt-1 px-2 py-1 text-[9px] text-[var(--text-muted)] hover:text-[var(--accent)] transition-colors rounded"
-            onClick={batchFilter}
-            title="Apply current filter settings to all images"
-          >
-            Apply to All ({otherImageCount})
-          </button>
         )}
       </Section>
 

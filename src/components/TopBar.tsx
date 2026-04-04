@@ -141,6 +141,25 @@ export default function TopBar({ onManageImages }: { onManageImages?: () => void
     }
   }, [state.images, pdfPageSize, customW, customH]);
 
+  const selectedImage = state.images.find((img) => img.id === state.selectedImageId);
+  const multipleImages = state.images.filter((img) => img.editState != null).length > 1;
+
+  const handleBatchRotateCW = useCallback(() => {
+    dispatch({ type: "BATCH_ROTATE", rotation: 90 });
+  }, [dispatch]);
+
+  const handleBatchRotateCCW = useCallback(() => {
+    dispatch({ type: "BATCH_ROTATE", rotation: 270 });
+  }, [dispatch]);
+
+  const handleBatchFilter = useCallback(() => {
+    if (!selectedImage?.editState) return;
+    dispatch({
+      type: "BATCH_SET_FILTER",
+      filterConfig: selectedImage.editState.filterConfig,
+    });
+  }, [selectedImage, dispatch]);
+
   const readyCount = state.images.filter(
     (img) => img.status === "ready" && img.cropCanvas,
   ).length;
@@ -172,6 +191,34 @@ export default function TopBar({ onManageImages }: { onManageImages?: () => void
           >
             Manage Images
           </button>
+        )}
+        {multipleImages && (
+          <>
+            <div className="w-px h-5 bg-[var(--border)]" />
+            <button
+              className="px-2 py-1.5 text-xs font-medium rounded-lg bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] transition-colors"
+              onClick={handleBatchRotateCW}
+              title="Rotate all images 90° CW"
+            >
+              Rotate All CW
+            </button>
+            <button
+              className="px-2 py-1.5 text-xs font-medium rounded-lg bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] transition-colors"
+              onClick={handleBatchRotateCCW}
+              title="Rotate all images 90° CCW"
+            >
+              Rotate All CCW
+            </button>
+            <button
+              className="px-2 py-1.5 text-xs font-medium rounded-lg bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] transition-colors disabled:opacity-40"
+              onClick={handleBatchFilter}
+              disabled={!selectedImage?.editState}
+              title="Apply current image's filter to all"
+            >
+              Apply Filter to All
+            </button>
+            <div className="w-px h-5 bg-[var(--border)]" />
+          </>
         )}
         <button
           className="px-3 py-1.5 text-xs font-medium rounded-lg bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] transition-colors disabled:opacity-40"
