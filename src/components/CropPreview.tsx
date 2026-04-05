@@ -207,6 +207,9 @@ export default function CropPreview({
     const container = containerRef.current;
     if (!canvas || !container) return;
 
+    // Shrink canvas so it doesn't inflate the container measurement
+    canvas.style.width = "0";
+    canvas.style.height = "0";
     const rect = container.getBoundingClientRect();
     if (rect.width === 0 || rect.height === 0) return;
 
@@ -261,9 +264,6 @@ export default function CropPreview({
     canvas.height = Math.round(cssH * dpr);
     canvas.style.width = `${cssW}px`;
     canvas.style.height = `${cssH}px`;
-    // Center the absolute-positioned canvas
-    canvas.style.left = `${Math.round((rect.width - cssW) / 2)}px`;
-    canvas.style.top = `${Math.round((rect.height - cssH) / 2)}px`;
 
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
@@ -288,7 +288,9 @@ export default function CropPreview({
     if (!el) return;
     const ro = new ResizeObserver(() => drawRef.current());
     ro.observe(el);
-    return () => ro.disconnect();
+    const onResize = () => requestAnimationFrame(() => drawRef.current());
+    window.addEventListener("resize", onResize);
+    return () => { ro.disconnect(); window.removeEventListener("resize", onResize); };
   }, []);
 
   // Draw brush strokes directly onto the display canvas (no React state update)
@@ -460,7 +462,7 @@ export default function CropPreview({
   return (
     <div
       ref={containerRef}
-      className="flex-1 overflow-hidden relative p-4"
+      className="flex-1 flex items-center justify-center overflow-hidden relative p-4"
       style={{
         ...(previewBg === "checker" ? {
           backgroundColor: "#3a3a44",
@@ -478,7 +480,7 @@ export default function CropPreview({
       onPointerUp={eraserActive ? handleEraserPointerUp : undefined}
       onPointerLeave={handlePointerLeave}
     >
-      <canvas ref={canvasRef} aria-label="Crop preview" style={{ position: "absolute" }} />
+      <canvas ref={canvasRef} aria-label="Crop preview" />
       {/* Lasso processing spinner */}
       {lassoProcessing && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/40 z-20">
