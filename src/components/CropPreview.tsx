@@ -250,7 +250,7 @@ export default function CropPreview({
     const availH = rect.height - pad;
     if (availW <= 0 || availH <= 0) return;
 
-    const scale = Math.min(availW / srcW, availH / srcH, 1);
+    const scale = Math.min(availW / srcW, availH / srcH);
     const cssW = Math.round(srcW * scale);
     const cssH = Math.round(srcH * scale);
 
