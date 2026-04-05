@@ -457,7 +457,13 @@ export default function CropPreview({
   return (
     <div
       ref={containerRef}
-      className="flex-1 flex items-center justify-center p-4 preview-bg overflow-hidden relative"
+      className="flex-1 flex items-center justify-center p-4 overflow-hidden relative"
+      style={{
+        backgroundColor: "#1a1a20",
+        backgroundImage: "linear-gradient(45deg, #15151a 25%, transparent 25%), linear-gradient(-45deg, #15151a 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #15151a 75%), linear-gradient(-45deg, transparent 75%, #15151a 75%)",
+        backgroundSize: "16px 16px",
+        backgroundPosition: "0 0, 0 8px, 8px -8px, -8px 0",
+      }}
       onPointerMove={handlePointerMove}
       onPointerDown={eraserActive ? handleEraserPointerDown : undefined}
       onPointerUp={eraserActive ? handleEraserPointerUp : undefined}
