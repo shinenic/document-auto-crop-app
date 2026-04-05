@@ -462,8 +462,8 @@ export default function CropPreview({
       className="flex-1 flex items-center justify-center p-4 overflow-hidden relative"
       style={{
         ...(previewBg === "checker" ? {
-          backgroundColor: "#1a1a20",
-          backgroundImage: "linear-gradient(45deg, #15151a 25%, transparent 25%), linear-gradient(-45deg, #15151a 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #15151a 75%), linear-gradient(-45deg, transparent 75%, #15151a 75%)",
+          backgroundColor: "#2a2a32",
+          backgroundImage: "linear-gradient(45deg, #222228 25%, transparent 25%), linear-gradient(-45deg, #222228 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #222228 75%), linear-gradient(-45deg, transparent 75%, #222228 75%)",
           backgroundSize: "16px 16px",
           backgroundPosition: "0 0, 0 8px, 8px -8px, -8px 0",
         } : {
