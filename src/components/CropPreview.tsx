@@ -315,9 +315,11 @@ export default function CropPreview({
   const handleEraserPointerDown = useCallback(
     (e: React.PointerEvent) => {
       if (!eraserActive || !selectedImage?.id || !selectedImage.editState) return;
-      const allowClamp = eraserTool === "lasso";
-      const pt = clientToSource(e.clientX, e.clientY, allowClamp);
+      const pt = clientToSource(e.clientX, e.clientY, true);
       if (!pt) return;
+
+      // Capture pointer so events continue even outside the container
+      (e.target as HTMLElement).setPointerCapture(e.pointerId);
 
       erasingRef.current = true;
       dispatch({ type: "PUSH_HISTORY", id: selectedImage.id });
@@ -341,8 +343,7 @@ export default function CropPreview({
   const handleEraserPointerMove = useCallback(
     (e: React.PointerEvent) => {
       if (!erasingRef.current || !selectedImage?.id || !selectedImage.editState) return;
-      const allowClamp = eraserTool === "lasso";
-      const pt = clientToSource(e.clientX, e.clientY, allowClamp);
+      const pt = clientToSource(e.clientX, e.clientY, true);
       if (!pt) return;
 
       if (eraserTool === "brush") {
@@ -420,10 +421,8 @@ export default function CropPreview({
 
   const handlePointerLeave = useCallback(() => {
     setLoupeVisible(false);
-    if (erasingRef.current) {
-      handleEraserPointerUp();
-    }
-  }, [handleEraserPointerUp]);
+    // Don't cancel eraser on leave — pointer capture keeps it active until pointerUp
+  }, []);
 
   // Build a circular cursor matching the brush size in display coordinates
   const [cursorScale, setCursorScale] = useState(1);
