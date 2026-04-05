@@ -207,6 +207,10 @@ export default function CropPreview({
     const container = containerRef.current;
     if (!canvas || !container) return;
 
+    // Reset canvas CSS size before measuring container so it doesn't inflate the layout
+    canvas.style.width = "0";
+    canvas.style.height = "0";
+
     const rect = container.getBoundingClientRect();
     if (rect.width === 0 || rect.height === 0) return;
 
