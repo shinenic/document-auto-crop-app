@@ -83,7 +83,7 @@ export default function EditorScreen() {
         }
         if (e.key === "]") {
           e.preventDefault();
-          setBrushSize((s) => Math.min(100, s + 5));
+          setBrushSize((s) => Math.min(150, s + 5));
           return;
         }
       }

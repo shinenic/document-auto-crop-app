@@ -313,7 +313,7 @@ export default function ToolPanel({
                     onChange={(v) => onSetEraserTool(v as "brush" | "lasso")}
                   />
                   {eraserTool === "brush" && (
-                    <Slider label="Brush Size" value={brushSize} min={5} max={100} step={1}
+                    <Slider label="Brush Size" value={brushSize} min={5} max={150} step={1}
                       disabled={false} onPointerDown={() => {}} onChange={onSetBrushSize} />
                   )}
                   {sel?.editState?.eraseMask && (
