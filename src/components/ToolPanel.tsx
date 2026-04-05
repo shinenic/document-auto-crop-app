@@ -337,7 +337,7 @@ export default function ToolPanel({
             const arc = sel?.editState?.edgeFits[idx]?.isArc ?? false;
             return (
               <button
-                className={`px-2 py-1 text-[10px] font-medium rounded transition-colors ${
+                className={`w-[60px] px-2 py-1 text-[10px] font-medium rounded transition-colors inline-flex items-center justify-center gap-0.5 ${
                   arc
                     ? "bg-[var(--accent-muted)] text-[var(--accent)] hover:bg-[var(--accent)]/20"
                     : "bg-[var(--bg-tertiary)] text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)]"
