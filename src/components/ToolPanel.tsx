@@ -247,8 +247,6 @@ export default function ToolPanel({
     );
   }
 
-  const BEZIER_ORDER = [2, 3, 1, 0];
-
   return (
     <div className="w-48 flex-shrink-0 bg-[var(--bg-secondary)] border-l border-[var(--border)] panel-inset p-2.5 flex flex-col gap-2.5 overflow-y-auto">
 
@@ -330,34 +328,43 @@ export default function ToolPanel({
 
       <div className="h-px bg-[var(--border)]" />
 
-      {/* Edge Curves */}
+      {/* Edge Curves — spatial layout */}
       <div>
         <SectionHeader title="Edge Curves" />
-        <div className="flex flex-col gap-1">
-            {BEZIER_ORDER.map((i) => {
-              const label = EDGE_LABELS[i];
-              const arc = sel?.editState?.edgeFits[i]?.isArc ?? false;
-              return (
-                <div key={i} className="flex items-center gap-1.5">
-                  <span className="w-12 text-[12px] text-[var(--text-primary)] font-medium shrink-0">{label}</span>
-                  <div className="flex flex-1 rounded-md overflow-hidden border border-[var(--border)]">
-                    <button
-                      className={`flex-1 flex items-center justify-center gap-1 py-1.5 text-[11px] font-medium transition-colors ${
-                        !arc ? "bg-[var(--bg-elevated)] text-[var(--text-primary)]" : "bg-[var(--bg-tertiary)] text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
-                      } disabled:opacity-20 disabled:pointer-events-none`}
-                      onClick={() => { if (arc) removeEdgeCurve(i); }} disabled={!hasCrop || !arc}
-                    ><IconLine /> Line</button>
-                    <button
-                      className={`flex-1 flex items-center justify-center gap-1 py-1.5 text-[11px] font-medium transition-colors ${
-                        arc ? "bg-[var(--accent-muted)] text-[var(--accent)]" : "bg-[var(--bg-tertiary)] text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
-                      } disabled:opacity-20 disabled:pointer-events-none`}
-                      onClick={() => { if (!arc) toggleEdge(i); }} disabled={!hasCrop || arc}
-                    ><IconCurve /> Curve</button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+        {(() => {
+          const EdgeBtn = ({ idx }: { idx: number }) => {
+            const arc = sel?.editState?.edgeFits[idx]?.isArc ?? false;
+            return (
+              <button
+                className={`px-2 py-1 text-[10px] font-medium rounded transition-colors ${
+                  arc
+                    ? "bg-[var(--accent-muted)] text-[var(--accent)] hover:bg-[var(--accent)]/20"
+                    : "bg-[var(--bg-tertiary)] text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)]"
+                } disabled:opacity-20 disabled:pointer-events-none`}
+                onClick={() => arc ? removeEdgeCurve(idx) : toggleEdge(idx)}
+                disabled={!hasCrop}
+                title={arc ? `Straighten ${EDGE_LABELS[idx].toLowerCase()} edge` : `Curve ${EDGE_LABELS[idx].toLowerCase()} edge`}
+              >
+                {arc ? <><IconCurve /> </> : <><IconLine /> </>}
+                {EDGE_LABELS[idx]}
+              </button>
+            );
+          };
+          return (
+            <div className="flex flex-col items-center gap-1">
+              {/* Top */}
+              <EdgeBtn idx={0} />
+              {/* Left + Right */}
+              <div className="flex items-center justify-between w-full">
+                <EdgeBtn idx={3} />
+                <div className="w-8 h-8 border border-[var(--border)] rounded-sm opacity-30" />
+                <EdgeBtn idx={1} />
+              </div>
+              {/* Bottom */}
+              <EdgeBtn idx={2} />
+            </div>
+          );
+        })()}
       </div>
 
       {/* Reset */}
