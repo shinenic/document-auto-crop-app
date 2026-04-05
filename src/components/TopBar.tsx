@@ -287,7 +287,7 @@ export default function TopBar({ onManageImages, previewBg, onSetPreviewBg }: {
     dispatch({ type: "BATCH_ROTATE", rotation: 270 });
   }, [dispatch]);
 
-  const [batchFilterType, setBatchFilterType] = useState<FilterConfig["type"]>("binarize");
+  const [batchFilterType, setBatchFilterType] = useState<FilterConfig["type"]>("none");
   const [batchBinarize, setBatchBinarize] = useState<BinarizeConfig>({ ...DEFAULT_BINARIZE_CONFIG });
 
   const handleBatchFilter = useCallback(() => {
