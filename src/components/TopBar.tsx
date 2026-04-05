@@ -129,7 +129,13 @@ function MenuLabel({ children }: { children: React.ReactNode }) {
 
 // --- Main Component ---
 
-export default function TopBar({ onManageImages }: { onManageImages?: () => void }) {
+type PreviewBg = "checker" | "black" | "white" | "gray";
+
+export default function TopBar({ onManageImages, previewBg, onSetPreviewBg }: {
+  onManageImages?: () => void;
+  previewBg?: PreviewBg;
+  onSetPreviewBg?: (bg: PreviewBg) => void;
+}) {
   const { state, dispatch } = useApp();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [exporting, setExporting] = useState(false);
@@ -309,6 +315,27 @@ export default function TopBar({ onManageImages }: { onManageImages?: () => void
       </div>
 
       <div className="flex items-center gap-1.5">
+        {/* Preview Background */}
+        {onSetPreviewBg && (
+          <div className="flex items-center gap-1 mr-1">
+            <span className="text-[10px] text-[var(--text-muted)]">BG</span>
+            {([
+              { value: "checker" as PreviewBg, title: "Checkerboard", style: { backgroundImage: "linear-gradient(45deg, #888 25%, transparent 25%), linear-gradient(-45deg, #888 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #888 75%), linear-gradient(-45deg, transparent 75%, #888 75%)", backgroundSize: "6px 6px", backgroundPosition: "0 0, 0 3px, 3px -3px, -3px 0" } },
+              { value: "black" as PreviewBg, title: "Black", style: { backgroundColor: "#000" } },
+              { value: "gray" as PreviewBg, title: "Gray", style: { backgroundColor: "#555" } },
+              { value: "white" as PreviewBg, title: "White", style: { backgroundColor: "#fff" } },
+            ]).map((opt) => (
+              <button
+                key={opt.value}
+                className={`w-5 h-5 rounded border transition-colors ${previewBg === opt.value ? "border-[var(--accent)] ring-1 ring-[var(--accent)]" : "border-[var(--border)] hover:border-[var(--border-hover)]"}`}
+                style={opt.style}
+                onClick={() => onSetPreviewBg(opt.value)}
+                title={opt.title}
+              />
+            ))}
+            <div className="w-px h-5 bg-[var(--border)] ml-1" />
+          </div>
+        )}
         {/* Add Images */}
         <button
           className="px-3 py-1.5 text-xs font-medium rounded-lg bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] transition-colors"

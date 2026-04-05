@@ -14,10 +14,12 @@ export default function CropPreview({
   eraserActive = false,
   eraserTool = "brush",
   brushSize = 20,
+  previewBg = "checker",
 }: {
   eraserActive?: boolean;
   eraserTool?: "brush" | "lasso";
   brushSize?: number;
+  previewBg?: "checker" | "black" | "white" | "gray";
 } = {}) {
   const { state, dispatch } = useApp();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -459,10 +461,14 @@ export default function CropPreview({
       ref={containerRef}
       className="flex-1 flex items-center justify-center p-4 overflow-hidden relative"
       style={{
-        backgroundColor: "#1a1a20",
-        backgroundImage: "linear-gradient(45deg, #15151a 25%, transparent 25%), linear-gradient(-45deg, #15151a 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #15151a 75%), linear-gradient(-45deg, transparent 75%, #15151a 75%)",
-        backgroundSize: "16px 16px",
-        backgroundPosition: "0 0, 0 8px, 8px -8px, -8px 0",
+        ...(previewBg === "checker" ? {
+          backgroundColor: "#1a1a20",
+          backgroundImage: "linear-gradient(45deg, #15151a 25%, transparent 25%), linear-gradient(-45deg, #15151a 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #15151a 75%), linear-gradient(-45deg, transparent 75%, #15151a 75%)",
+          backgroundSize: "16px 16px",
+          backgroundPosition: "0 0, 0 8px, 8px -8px, -8px 0",
+        } : {
+          backgroundColor: previewBg === "black" ? "#000" : previewBg === "white" ? "#fff" : "#555",
+        }),
         cursor: eraserActive ? brushCursor : undefined,
         touchAction: eraserActive ? "none" : undefined,
       }}

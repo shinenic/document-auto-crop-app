@@ -33,6 +33,7 @@ export default function EditorScreen() {
   const [eraserTool, setEraserTool] = useState<"brush" | "lasso">("brush");
   const [brushSize, setBrushSize] = useState(20);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [previewBg, setPreviewBg] = useState<"checker" | "black" | "white" | "gray">("checker");
 
   // Exit eraser mode when switching images
   useEffect(() => {
@@ -308,7 +309,7 @@ export default function EditorScreen() {
 
   return (
     <div className="h-dvh flex flex-col">
-      <TopBar onManageImages={() => setSortModalOpen(true)} />
+      <TopBar onManageImages={() => setSortModalOpen(true)} previewBg={previewBg} onSetPreviewBg={setPreviewBg} />
       <div className="flex-1 flex min-h-0">
         <div className="flex flex-col flex-shrink-0 relative border-r border-[var(--border)] bg-[var(--bg-secondary)]" style={{ width: sidebarWidth }}>
           <ImageList />
@@ -342,6 +343,7 @@ export default function EditorScreen() {
               eraserActive={eraserActive}
               eraserTool={eraserTool}
               brushSize={brushSize}
+              previewBg={previewBg}
             />
           </div>
         </div>
