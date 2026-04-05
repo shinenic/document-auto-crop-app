@@ -296,17 +296,16 @@ export default function CropPreview({
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const dpr = window.devicePixelRatio || 1;
-    const scaleX = (canvas.width / info.srcW);
-    const scaleY = (canvas.height / info.srcH);
+    const scaleX = canvas.width / info.srcW;
+    const scaleY = canvas.height / info.srcH;
 
     ctx.fillStyle = "#ffffff";
     for (const [cx, cy] of points) {
       const px = cx * scaleX;
       const py = cy * scaleY;
-      const r = brushSize * Math.min(scaleX, scaleY);
+      // Draw ellipse matching the exact brush radius in each axis
       ctx.beginPath();
-      ctx.arc(px, py, r, 0, Math.PI * 2);
+      ctx.ellipse(px, py, brushSize * scaleX, brushSize * scaleY, 0, 0, Math.PI * 2);
       ctx.fill();
     }
   }, [brushSize]);
@@ -427,12 +426,12 @@ export default function CropPreview({
   // Build a circular cursor matching the brush size in display coordinates
   const [cursorScale, setCursorScale] = useState(1);
   useEffect(() => {
-    const canvas = canvasRef.current;
     const info = scaleInfoRef.current;
-    if (canvas && info && info.srcW > 0) {
-      setCursorScale(canvas.getBoundingClientRect().width / info.srcW);
+    if (info && info.srcW > 0) {
+      // Use cssW (not getBoundingClientRect) to match the draw coordinate space
+      setCursorScale(info.cssW / info.srcW);
     }
-  }, [selectedImage?.cropCanvas, selectedImage?.editState?.rotation]);
+  }, [selectedImage?.cropCanvas, selectedImage?.editState?.rotation, selectedImage?.filteredCanvas]);
 
   const brushCursor = useMemo(() => {
     if (!eraserActive || eraserTool !== "brush") return "crosshair";
