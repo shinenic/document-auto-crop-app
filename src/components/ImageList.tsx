@@ -94,7 +94,7 @@ function Thumbnail({
     >
       <div className="relative aspect-[4/3] rounded overflow-hidden bg-[var(--bg-tertiary)] flex items-center justify-center">
         <div className="absolute top-1 left-1 z-10 w-4 h-4 rounded-full bg-black/60 flex items-center justify-center">
-          <span className="text-[8px] font-mono text-white leading-none">{index + 1}</span>
+          <span className="text-[10px] font-mono text-white leading-none">{index + 1}</span>
         </div>
         {status === "processing" ? (
           <div className="w-5 h-5 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin" />

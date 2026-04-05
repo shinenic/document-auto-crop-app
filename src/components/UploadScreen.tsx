@@ -57,10 +57,12 @@ export default function UploadScreen() {
       </div>
 
       <div
+        role="button"
+        tabIndex={0}
         className={`
           relative w-full max-w-lg aspect-[4/3] rounded-xl border-2 border-dashed
           flex flex-col items-center justify-center gap-5 cursor-pointer
-          transition-all duration-200
+          transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]
           ${
             dragOver
               ? "border-[var(--accent)] bg-[var(--accent-muted)] scale-[1.01]"
@@ -71,10 +73,11 @@ export default function UploadScreen() {
         onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
         onDragLeave={() => setDragOver(false)}
         onClick={() => fileInputRef.current?.click()}
+        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); fileInputRef.current?.click(); } }}
       >
         <div className={`w-14 h-14 rounded-xl flex items-center justify-center transition-colors ${dragOver ? "bg-[var(--accent)]/15" : "bg-[var(--bg-tertiary)]"}`}>
           <svg className={`w-7 h-7 transition-colors ${dragOver ? "text-[var(--accent)]" : "text-[var(--text-muted)]"}`}
-            fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round"
               d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
           </svg>
@@ -103,11 +106,11 @@ export default function UploadScreen() {
       {/* Workflow hint */}
       <div className="mt-8 flex items-center gap-6 text-[11px] text-[var(--text-muted)]">
         <span>Upload</span>
-        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M2 6h8M7 3l3 3-3 3" /></svg>
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true"><path d="M2 6h8M7 3l3 3-3 3" /></svg>
         <span>Auto-Crop</span>
-        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M2 6h8M7 3l3 3-3 3" /></svg>
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true"><path d="M2 6h8M7 3l3 3-3 3" /></svg>
         <span>Filter</span>
-        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M2 6h8M7 3l3 3-3 3" /></svg>
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true"><path d="M2 6h8M7 3l3 3-3 3" /></svg>
         <span>Export</span>
       </div>
     </div>

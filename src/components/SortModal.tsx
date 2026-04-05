@@ -89,7 +89,7 @@ function SortableItem({
         onPointerDown={(e) => e.stopPropagation()}
         title="Remove image"
       >
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true">
           <path d="M18 6L6 18M6 6l12 12" />
         </svg>
       </button>
@@ -119,6 +119,15 @@ export default function SortModal({ onClose }: { onClose: () => void }) {
   );
   const [activeId, setActiveId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
+
+  // Focus trap and restore focus on close
+  useEffect(() => {
+    previousFocusRef.current = document.activeElement as HTMLElement;
+    dialogRef.current?.focus();
+    return () => { previousFocusRef.current?.focus(); };
+  }, []);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -171,11 +180,36 @@ export default function SortModal({ onClose }: { onClose: () => void }) {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="bg-[var(--bg-secondary)] border border-[var(--border)] rounded-xl w-full max-w-5xl flex flex-col shadow-2xl mx-4" style={{ maxHeight: "calc(100vh - 80px)" }}>
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="sort-modal-title"
+        tabIndex={-1}
+        className="bg-[var(--bg-secondary)] border border-[var(--border)] rounded-xl w-full max-w-5xl flex flex-col shadow-2xl mx-4 outline-none"
+        style={{ maxHeight: "calc(100vh - 80px)" }}
+        onKeyDown={(e) => {
+          if (e.key === "Tab") {
+            const focusable = dialogRef.current?.querySelectorAll<HTMLElement>(
+              'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+            );
+            if (!focusable || focusable.length === 0) return;
+            const first = focusable[0];
+            const last = focusable[focusable.length - 1];
+            if (e.shiftKey && document.activeElement === first) {
+              e.preventDefault();
+              last.focus();
+            } else if (!e.shiftKey && document.activeElement === last) {
+              e.preventDefault();
+              first.focus();
+            }
+          }
+        }}
+      >
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)]">
           <div>
-            <h3 className="text-sm font-medium text-[var(--text-primary)]">
+            <h3 id="sort-modal-title" className="text-sm font-medium text-[var(--text-primary)]">
               Manage Images
               <span className="ml-2 text-[var(--text-muted)] font-normal">
                 {orderedImages.length} image{orderedImages.length !== 1 ? "s" : ""}
@@ -188,8 +222,9 @@ export default function SortModal({ onClose }: { onClose: () => void }) {
           <button
             className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
             onClick={onClose}
+            aria-label="Close"
           >
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
               <path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z" />
             </svg>
           </button>

@@ -27,6 +27,7 @@ function DropdownMenu({
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -39,6 +40,25 @@ function DropdownMenu({
     return () => document.removeEventListener("mousedown", handleClick);
   }, [open]);
 
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      setOpen(false);
+      return;
+    }
+    if (!menuRef.current) return;
+    const items = Array.from(menuRef.current.querySelectorAll<HTMLElement>('button:not(:disabled), select, input'));
+    if (items.length === 0) return;
+    const idx = items.indexOf(document.activeElement as HTMLElement);
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      items[idx < items.length - 1 ? idx + 1 : 0]?.focus();
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      items[idx > 0 ? idx - 1 : items.length - 1]?.focus();
+    }
+  }, []);
+
   const btnClass = accent
     ? "px-3 py-1.5 text-xs font-medium rounded-lg bg-[var(--accent)] text-[var(--bg-primary)] hover:bg-[var(--accent-hover)] transition-colors disabled:opacity-40 flex items-center gap-1"
     : "px-3 py-1.5 text-xs font-medium rounded-lg bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] transition-colors disabled:opacity-40 flex items-center gap-1";
@@ -49,14 +69,17 @@ function DropdownMenu({
         className={btnClass}
         onClick={() => setOpen((v) => !v)}
         disabled={disabled}
+        aria-haspopup="true"
+        aria-expanded={open}
       >
         {label}
-        <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor" className={`transition-transform ${open ? "rotate-180" : ""}`}>
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor" aria-hidden="true" className={`transition-transform ${open ? "rotate-180" : ""}`}>
           <path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </button>
       {open && (
-        <div className="absolute right-0 top-full mt-1 bg-[var(--bg-elevated)] border border-[var(--border)] rounded-lg shadow-xl z-50 py-1 overflow-hidden" style={{ minWidth }}
+        <div ref={menuRef} role="menu" className="absolute right-0 top-full mt-1 bg-[var(--bg-elevated)] border border-[var(--border)] rounded-lg shadow-xl z-50 py-1 overflow-hidden" style={{ minWidth }}
+          onKeyDown={handleKeyDown}
           onClick={(e) => {
             // Auto-close when a MenuItem (button) is clicked
             const t = e.target as HTMLElement;
@@ -85,6 +108,7 @@ function MenuItem({
 }) {
   return (
     <button
+      role="menuitem"
       className="w-full flex items-center justify-between px-3 py-2 text-xs text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)] transition-colors disabled:opacity-30 disabled:pointer-events-none text-left"
       onClick={onClick}
       disabled={disabled}

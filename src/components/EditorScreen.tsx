@@ -361,9 +361,9 @@ export default function EditorScreen() {
       {/* Keyboard shortcuts overlay */}
       {shortcutsOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShortcutsOpen(false)}>
-          <div className="bg-[var(--bg-secondary)] border border-[var(--border)] rounded-xl shadow-2xl p-5 max-w-sm w-full mx-4" onClick={(e) => e.stopPropagation()}>
+          <div role="dialog" aria-modal="true" aria-labelledby="shortcuts-title" className="bg-[var(--bg-secondary)] border border-[var(--border)] rounded-xl shadow-2xl p-5 max-w-sm w-full mx-4" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-[13px] font-semibold text-[var(--text-primary)]">Keyboard Shortcuts</h3>
+              <h3 id="shortcuts-title" className="text-[13px] font-semibold text-[var(--text-primary)]">Keyboard Shortcuts</h3>
               <kbd className="text-[10px] text-[var(--text-muted)] font-mono bg-[var(--bg-tertiary)] px-1.5 py-0.5 rounded">?</kbd>
             </div>
             {[

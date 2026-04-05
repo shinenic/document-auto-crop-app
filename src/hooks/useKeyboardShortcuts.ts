@@ -1,21 +1,25 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useApp } from "../context/AppContext";
 import { rotateCanvas } from "../lib/crop";
 import { applyEraseMask } from "../lib/eraser";
+import type { AppState } from "../lib/types";
 
 export function useKeyboardShortcuts() {
   const { state, dispatch } = useApp();
+  const stateRef = useRef<AppState>(state);
+  useEffect(() => { stateRef.current = state; });
 
   useEffect(() => {
     if (state.screen !== "editor") return;
 
     const handler = (e: KeyboardEvent) => {
+      const s = stateRef.current;
       const meta = e.metaKey || e.ctrlKey;
       const shift = e.shiftKey;
-      const selectedImage = state.images.find(
-        (img) => img.id === state.selectedImageId,
+      const selectedImage = s.images.find(
+        (img) => img.id === s.selectedImageId,
       );
       const id = selectedImage?.id;
       if (!id) return;
@@ -82,17 +86,17 @@ export function useKeyboardShortcuts() {
       // Navigate images: ArrowUp / ArrowDown
       if (e.key === "ArrowUp" || e.key === "ArrowDown") {
         e.preventDefault();
-        const idx = state.images.findIndex(
-          (img) => img.id === state.selectedImageId,
+        const idx = s.images.findIndex(
+          (img) => img.id === s.selectedImageId,
         );
         const newIdx =
           e.key === "ArrowUp"
             ? Math.max(0, idx - 1)
-            : Math.min(state.images.length - 1, idx + 1);
+            : Math.min(s.images.length - 1, idx + 1);
         if (newIdx !== idx) {
           dispatch({
             type: "SELECT_IMAGE",
-            id: state.images[newIdx].id,
+            id: s.images[newIdx].id,
           });
         }
         return;
@@ -129,5 +133,5 @@ export function useKeyboardShortcuts() {
 
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [state, dispatch]);
+  }, [state.screen, dispatch]);
 }

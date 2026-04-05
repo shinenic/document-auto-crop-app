@@ -9,6 +9,15 @@ const LOUPE_CSS = 320;
 const LOUPE_ZOOM_CORNER = 3;
 const LOUPE_ZOOM_CP = 1.8;
 
+// Canvas colors — mirror design tokens (canvas API can't read CSS vars)
+const CANVAS_BG = "#111115";        // --bg-secondary
+const EDGE_STROKE = "#4dd4b4";      // --accent
+const GUIDE_STROKE = "rgba(100, 150, 255, 0.6)";
+const CP_FILL = "rgba(77, 212, 180, 0.4)";         // accent-derived
+const CP_FILL_SEL = "rgba(77, 212, 180, 0.7)";
+const CORNER_FILL = "rgba(232, 85, 85, 0.15)";     // danger-derived
+const CORNER_FILL_SEL = "rgba(232, 85, 85, 0.35)";
+
 interface Props {
   onDragStart: () => void;
   onDragEnd: () => void;
@@ -62,19 +71,6 @@ export default function QuadEditor({ onDragStart, onDragEnd }: Props) {
     return { sx: canW / canvas.clientWidth, sy: canH / canvas.clientHeight };
   }, [canW, canH]);
 
-  const toMask = useCallback(
-    (e: React.MouseEvent): [number, number] => {
-      const canvas = canvasRef.current;
-      if (!canvas) return [0, 0];
-      const rect = canvas.getBoundingClientRect();
-      const { sx, sy } = getScale();
-      const cx = (e.clientX - rect.left) * sx - padX;
-      const cy = (e.clientY - rect.top) * sy - padY;
-      return [cx / (imgW / maskWidth), cy / (imgH / maskHeight)];
-    },
-    [getScale, padX, padY, imgW, imgH, maskWidth, maskHeight],
-  );
-
   const maskToCanvas = useCallback(
     (mx: number, my: number): [number, number] => [
       mx * (imgW / maskWidth) + padX,
@@ -121,7 +117,7 @@ export default function QuadEditor({ onDragStart, onDragEnd }: Props) {
     canvas.width = canW;
     canvas.height = canH;
     const ctx = canvas.getContext("2d")!;
-    ctx.fillStyle = "#111";
+    ctx.fillStyle = CANVAS_BG;
     ctx.fillRect(0, 0, canW, canH);
     ctx.drawImage(baseCanvas, padX, padY);
     ctx.translate(padX, padY);
@@ -154,7 +150,7 @@ export default function QuadEditor({ onDragStart, onDragEnd }: Props) {
     }
     ctx.closePath();
     ctx.lineWidth = lw;
-    ctx.strokeStyle = "#64ffda";
+    ctx.strokeStyle = EDGE_STROKE;
     ctx.stroke();
 
     // Draw CPs and guide lines
@@ -165,7 +161,7 @@ export default function QuadEditor({ onDragStart, onDragEnd }: Props) {
 
       ctx.setLineDash([6, 6]);
       ctx.lineWidth = Math.max(1, lw / 2);
-      ctx.strokeStyle = "rgba(100, 150, 255, 0.6)";
+      ctx.strokeStyle = GUIDE_STROKE;
       ctx.beginPath(); ctx.moveTo(start[0] * sx, start[1] * sy); ctx.lineTo(fit.cp1[0] * sx, fit.cp1[1] * sy); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(end[0] * sx, end[1] * sy); ctx.lineTo(fit.cp2[0] * sx, fit.cp2[1] * sy); ctx.stroke();
       ctx.setLineDash([]);
@@ -174,7 +170,7 @@ export default function QuadEditor({ onDragStart, onDragEnd }: Props) {
         const sel = selected?.type === cpKey && selected?.edgeIdx === i;
         ctx.beginPath();
         ctx.arc(cp[0] * sx, cp[1] * sy, sel ? cpRSel : cpR, 0, 2 * Math.PI);
-        ctx.fillStyle = sel ? "rgba(170,204,255,0.7)" : "rgba(68,136,255,0.5)";
+        ctx.fillStyle = sel ? CP_FILL_SEL : CP_FILL;
         ctx.fill();
         ctx.strokeStyle = "#fff";
         ctx.lineWidth = Math.max(1, lw / 2);
@@ -189,7 +185,7 @@ export default function QuadEditor({ onDragStart, onDragEnd }: Props) {
       const cx = corners[i][0] * sx, cy = corners[i][1] * sy;
       ctx.beginPath();
       ctx.arc(cx, cy, cr, 0, 2 * Math.PI);
-      ctx.fillStyle = sel ? "rgba(255,80,80,0.35)" : "rgba(255,50,50,0.15)";
+      ctx.fillStyle = sel ? CORNER_FILL_SEL : CORNER_FILL;
       ctx.fill();
       ctx.strokeStyle = "#fff";
       ctx.lineWidth = sel ? 4 : 3;
@@ -214,10 +210,25 @@ export default function QuadEditor({ onDragStart, onDragEnd }: Props) {
     return pts;
   }, [editState]);
 
-  const handleMouseDown = useCallback(
-    (e: React.MouseEvent) => {
+  const toMaskFromPointer = useCallback(
+    (e: React.PointerEvent): [number, number] => {
+      const canvas = canvasRef.current;
+      if (!canvas) return [0, 0];
+      const rect = canvas.getBoundingClientRect();
+      const { sx, sy } = getScale();
+      const cx = (e.clientX - rect.left) * sx - padX;
+      const cy = (e.clientY - rect.top) * sy - padY;
+      return [cx / (imgW / maskWidth), cy / (imgH / maskHeight)];
+    },
+    [getScale, padX, padY, imgW, imgH, maskWidth, maskHeight],
+  );
+
+  const handlePointerDown = useCallback(
+    (e: React.PointerEvent) => {
       if (!editState || !selectedImage) return;
-      const [mx, my] = toMask(e);
+      const canvas = canvasRef.current;
+      if (canvas) canvas.setPointerCapture(e.pointerId);
+      const [mx, my] = toMaskFromPointer(e);
       const pts = getAllPoints();
       let bestDist = Infinity;
       let bestPt: (typeof pts)[0] | null = null;
@@ -240,13 +251,13 @@ export default function QuadEditor({ onDragStart, onDragEnd }: Props) {
         setSelected(null);
       }
     },
-    [editState, selectedImage, toMask, getAllPoints, getScale, imgW, maskWidth, maskToCanvas],
+    [editState, selectedImage, toMaskFromPointer, getAllPoints, getScale, imgW, maskWidth, maskHeight, maskToCanvas],
   );
 
-  const handleMouseMove = useCallback(
-    (e: React.MouseEvent) => {
+  const handlePointerMove = useCallback(
+    (e: React.PointerEvent) => {
       if (!dragging || !selected || !editState || !selectedImage) return;
-      const [mx, my] = toMask(e);
+      const [mx, my] = toMaskFromPointer(e);
 
       if (!dragStartRef.current) {
         dispatch({ type: "PUSH_HISTORY", id: selectedImage.id });
@@ -292,10 +303,10 @@ export default function QuadEditor({ onDragStart, onDragEnd }: Props) {
         });
       }
     },
-    [dragging, selected, editState, selectedImage, toMask, dispatch, onDragStart, maskToCanvas],
+    [dragging, selected, editState, selectedImage, toMaskFromPointer, dispatch, onDragStart, maskToCanvas],
   );
 
-  const handleMouseUp = useCallback(() => {
+  const handlePointerUp = useCallback(() => {
     if (dragging) {
       setDragging(false);
       if (dragStartRef.current) onDragEnd();
@@ -319,12 +330,13 @@ export default function QuadEditor({ onDragStart, onDragEnd }: Props) {
     <div className="flex-1 relative flex items-center justify-center p-4 overflow-hidden">
       <canvas
         ref={canvasRef}
+        aria-label="Document boundary editor — drag corners and control points to adjust crop"
         className="max-w-full max-h-full"
-        style={{ cursor: dragging ? "grabbing" : "pointer", aspectRatio: `${canW} / ${canH}` }}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
+        style={{ cursor: dragging ? "grabbing" : "pointer", aspectRatio: `${canW} / ${canH}`, touchAction: "none" }}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerLeave={handlePointerUp}
       />
       <canvas
         ref={loupeRef}
@@ -334,7 +346,7 @@ export default function QuadEditor({ onDragStart, onDragEnd }: Props) {
           opacity: dragging ? 1 : 0,
           pointerEvents: "none",
           border: "1px solid var(--border)",
-          background: "#111",
+          background: CANVAS_BG,
           ...(loupeCorner.includes("t") ? { top: 12 } : { bottom: 12 }),
           ...(loupeCorner.includes("r") ? { right: 12 } : { left: 12 }),
         }}
