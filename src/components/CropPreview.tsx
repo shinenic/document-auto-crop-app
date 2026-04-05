@@ -250,7 +250,7 @@ export default function CropPreview({
     const availH = rect.height - pad;
     if (availW <= 0 || availH <= 0) return;
 
-    const scale = Math.min(availW / srcW, availH / srcH, 1);
+    const scale = Math.min(availW / srcW, availH / srcH);
     const cssW = Math.round(srcW * scale);
     const cssH = Math.round(srcH * scale);
 
@@ -283,12 +283,26 @@ export default function CropPreview({
     draw();
   }, [draw]);
 
+  // Poll container size on every frame — ResizeObserver unreliable in this flex layout
   useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const ro = new ResizeObserver(() => drawRef.current());
-    ro.observe(el);
-    return () => ro.disconnect();
+    let prevW = 0;
+    let prevH = 0;
+    let rafId: number;
+    const check = () => {
+      const el = containerRef.current;
+      if (el) {
+        const w = el.clientWidth;
+        const h = el.clientHeight;
+        if (w !== prevW || h !== prevH) {
+          prevW = w;
+          prevH = h;
+          drawRef.current();
+        }
+      }
+      rafId = requestAnimationFrame(check);
+    };
+    rafId = requestAnimationFrame(check);
+    return () => cancelAnimationFrame(rafId);
   }, []);
 
   // Draw brush strokes directly onto the display canvas (no React state update)
