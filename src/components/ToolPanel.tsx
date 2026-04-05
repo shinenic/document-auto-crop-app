@@ -332,36 +332,40 @@ export default function ToolPanel({
       <div>
         <SectionHeader title="Edge Curves" />
         {(() => {
-          const EdgeBtn = ({ idx }: { idx: number }) => {
+          const EdgeRow = ({ idx, compact }: { idx: number; compact?: boolean }) => {
             const arc = sel?.editState?.edgeFits[idx]?.isArc ?? false;
             return (
-              <button
-                className={`px-2 py-1 text-[10px] font-medium rounded transition-colors ${
-                  arc
-                    ? "bg-[var(--accent-muted)] text-[var(--accent)] hover:bg-[var(--accent)]/20"
-                    : "bg-[var(--bg-tertiary)] text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)]"
-                } disabled:opacity-20 disabled:pointer-events-none`}
-                onClick={() => arc ? removeEdgeCurve(idx) : toggleEdge(idx)}
-                disabled={!hasCrop}
-                title={arc ? `Straighten ${EDGE_LABELS[idx].toLowerCase()} edge` : `Curve ${EDGE_LABELS[idx].toLowerCase()} edge`}
-              >
-                {arc ? <><IconCurve /> </> : <><IconLine /> </>}
-                {EDGE_LABELS[idx]}
-              </button>
+              <div className={`flex items-center gap-1 ${compact ? "" : ""}`}>
+                <span className="w-7 text-[10px] text-[var(--text-secondary)] font-medium shrink-0 text-center">{EDGE_LABELS[idx]}</span>
+                <div className="flex flex-1 rounded-md overflow-hidden border border-[var(--border)]">
+                  <button
+                    className={`flex-1 flex items-center justify-center gap-0.5 py-1 text-[10px] font-medium transition-colors ${
+                      !arc ? "bg-[var(--bg-elevated)] text-[var(--text-primary)]" : "bg-[var(--bg-tertiary)] text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+                    } disabled:opacity-20 disabled:pointer-events-none`}
+                    onClick={() => { if (arc) removeEdgeCurve(idx); }} disabled={!hasCrop || !arc}
+                  ><IconLine /></button>
+                  <button
+                    className={`flex-1 flex items-center justify-center gap-0.5 py-1 text-[10px] font-medium transition-colors ${
+                      arc ? "bg-[var(--accent-muted)] text-[var(--accent)]" : "bg-[var(--bg-tertiary)] text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+                    } disabled:opacity-20 disabled:pointer-events-none`}
+                    onClick={() => { if (!arc) toggleEdge(idx); }} disabled={!hasCrop || arc}
+                  ><IconCurve /></button>
+                </div>
+              </div>
             );
           };
           return (
-            <div className="flex flex-col items-center gap-1">
+            <div className="flex flex-col items-center gap-1.5">
               {/* Top */}
-              <EdgeBtn idx={0} />
+              <div className="w-28"><EdgeRow idx={0} /></div>
               {/* Left + Right */}
-              <div className="flex items-center justify-between w-full">
-                <EdgeBtn idx={3} />
-                <div className="w-8 h-8 border border-[var(--border)] rounded-sm opacity-30" />
-                <EdgeBtn idx={1} />
+              <div className="flex items-center justify-between w-full gap-1">
+                <div className="flex-1"><EdgeRow idx={3} /></div>
+                <div className="w-6 h-6 border border-[var(--border)] rounded-sm opacity-25 shrink-0" />
+                <div className="flex-1"><EdgeRow idx={1} /></div>
               </div>
               {/* Bottom */}
-              <EdgeBtn idx={2} />
+              <div className="w-28"><EdgeRow idx={2} /></div>
             </div>
           );
         })()}
