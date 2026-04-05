@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useEffect, useState } from "react";
+import { useCallback, useRef, useEffect } from "react";
 import { useApp } from "../context/AppContext";
 import { EDGE_LABELS, DEFAULT_FILTER_CONFIG } from "../lib/types";
 import type { FilterConfig, BinarizeConfig } from "../lib/types";
@@ -8,27 +8,34 @@ import type { FilterConfig, BinarizeConfig } from "../lib/types";
 // --- Icons (14px stroke) ---
 
 const I = ({ d, size = 14 }: { d: string; size?: number }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={d} /></svg>
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={d} /></svg>
 );
 
 function IconUndo() { return <I d="M3 7v6h6M3 13a9 9 0 1 0 3-7.7L3 7" />; }
 function IconRedo() { return <I d="M21 7v6h-6M21 13a9 9 0 1 1-3-7.7L21 7" />; }
 function IconRotateCW() { return <I d="M21 2v6h-6M21 8a9 9 0 1 1-3.3-5.3" />; }
 function IconRotateCCW() { return <I d="M3 2v6h6M3 8a9 9 0 1 0 3.3-5.3" />; }
-function IconEraser() { return <><I d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21" /><I d="M22 21H7" /><I d="m5 11 9 9" /></>; }
+function IconEraser() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M20 20H7L3.7 16.7a1 1 0 0 1 0-1.4L14.3 4.3a1 1 0 0 1 1.4 0L21.7 10.3a1 1 0 0 1 0 1.4L13 20" />
+      <path d="m6.5 13.5 5 5" />
+    </svg>
+  );
+}
 function IconBrush() { return <><I d="m9.06 11.9 8.07-8.06a2.85 2.85 0 1 1 4.03 4.03l-8.06 8.08" /><I d="M7.07 14.94c-1.66 0-3 1.35-3 3.02 0 1.33-2.5 1.52-2 2.02 1.08 1.1 2.49 2.02 4 2.02 2.2 0 4-1.8 4-4.04a3.01 3.01 0 0 0-3-3.02z" /></>; }
 function IconLasso() { return <><I d="M7 22a5 5 0 0 1-2-4" /><I d="M3.3 14A6.8 6.8 0 0 1 2 10c0-4.4 4.5-8 10-8s10 3.6 10 8-4.5 8-10 8a12 12 0 0 1-3.7-.5" /><circle cx="7" cy="18" r="1" fill="currentColor" /></>; }
 function IconTrash() { return <I d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />; }
 function IconReset() { return <I d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8M3 3v5h5" />; }
 function IconChevron({ open }: { open: boolean }) {
   return (
-    <svg width="10" height="10" viewBox="0 0 10 10" className={`transition-transform duration-150 ${open ? "rotate-180" : ""}`}>
+    <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true" className={`transition-transform duration-150 ${open ? "rotate-180" : ""}`}>
       <path d="M2.5 3.5L5 6L7.5 3.5" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
-function IconCurve() { return <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M3 20Q12 4 21 20" /></svg>; }
-function IconLine() { return <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="3" y1="20" x2="21" y2="4" /></svg>; }
+function IconCurve() { return <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true"><path d="M3 20Q12 4 21 20" /></svg>; }
+function IconLine() { return <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true"><line x1="3" y1="20" x2="21" y2="4" /></svg>; }
 
 // --- Primitives ---
 
@@ -63,6 +70,7 @@ function SectionHeader({ title, collapsible, open, onToggle }: {
     <Tag
       className={`flex items-center justify-between w-full text-[11px] uppercase tracking-[0.06em] text-[var(--text-muted)] mb-1.5 px-0.5 font-semibold ${collapsible ? "cursor-pointer hover:text-[var(--text-secondary)] transition-colors" : ""}`}
       onClick={collapsible ? onToggle : undefined}
+      {...(collapsible ? { "aria-expanded": open } : {})}
     >
       <span>{title}</span>
       {collapsible && <IconChevron open={open ?? false} />}
@@ -94,9 +102,11 @@ function TogglePill({ options, value, onChange, disabled = false }: {
   value: string; onChange: (v: string) => void; disabled?: boolean;
 }) {
   return (
-    <div className="flex rounded-md overflow-hidden border border-[var(--border)]">
+    <div role="radiogroup" className="flex rounded-md overflow-hidden border border-[var(--border)]">
       {options.map((opt) => (
         <button key={opt.value}
+          role="radio"
+          aria-checked={value === opt.value}
           className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-[6px] text-[11px] font-medium transition-colors ${
             value === opt.value
               ? "bg-[var(--accent-muted)] text-[var(--accent)]"
@@ -128,9 +138,6 @@ export default function ToolPanel({
   const canRedo = (sel?.history.future.length ?? 0) > 0;
   const hasCrop = sel?.editState != null;
   const id = sel?.id;
-
-  const [edgeCurvesOpen, setEdgeCurvesOpen] = useState(false);
-  const [resetOpen, setResetOpen] = useState(false);
 
   const undo = useCallback(() => { if (id) dispatch({ type: "UNDO", id }); }, [id, dispatch]);
   const redo = useCallback(() => { if (id) dispatch({ type: "REDO", id }); }, [id, dispatch]);
@@ -308,11 +315,10 @@ export default function ToolPanel({
 
       <div className="h-px bg-[var(--border)]" />
 
-      {/* Edge Curves — collapsible */}
+      {/* Edge Curves */}
       <div>
-        <SectionHeader title="Edge Curves" collapsible open={edgeCurvesOpen} onToggle={() => setEdgeCurvesOpen((v) => !v)} />
-        {edgeCurvesOpen && (
-          <div className="flex flex-col gap-1 mt-1">
+        <SectionHeader title="Edge Curves" />
+        <div className="flex flex-col gap-1">
             {BEZIER_ORDER.map((i) => {
               const label = EDGE_LABELS[i];
               const arc = sel?.editState?.edgeFits[i]?.isArc ?? false;
@@ -337,18 +343,15 @@ export default function ToolPanel({
               );
             })}
           </div>
-        )}
       </div>
 
-      {/* Reset — collapsible */}
+      {/* Reset */}
       <div>
-        <SectionHeader title="Reset" collapsible open={resetOpen} onToggle={() => setResetOpen((v) => !v)} />
-        {resetOpen && (
-          <div className="flex flex-col gap-1 mt-1">
-            <Btn icon={<IconReset />} label="Reset to Prediction" onClick={resetToPrediction} />
-            <Btn icon={<IconTrash />} label="Cancel Crop" onClick={cancelCrop} danger />
-          </div>
-        )}
+        <SectionHeader title="Reset" />
+        <div className="flex flex-col gap-1">
+          <Btn icon={<IconReset />} label="Reset to Prediction" onClick={resetToPrediction} />
+          <Btn icon={<IconTrash />} label="Cancel Crop" onClick={cancelCrop} danger />
+        </div>
       </div>
     </div>
   );

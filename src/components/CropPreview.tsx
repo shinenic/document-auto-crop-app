@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useEffect, useCallback, useState } from "react";
+import { useRef, useEffect, useCallback, useState, useMemo } from "react";
 import { useApp } from "../context/AppContext";
 import { rotateCanvas } from "../lib/crop";
 import { applyEraseMask, createEraseMask, paintBrushStroke, fillLassoRegion } from "../lib/eraser";
@@ -309,9 +309,9 @@ export default function CropPreview({
     }
   }, [brushSize]);
 
-  // Eraser mouse handlers
-  const handleEraserMouseDown = useCallback(
-    (e: React.MouseEvent) => {
+  // Eraser pointer handlers
+  const handleEraserPointerDown = useCallback(
+    (e: React.PointerEvent) => {
       if (!eraserActive || !selectedImage?.id || !selectedImage.editState) return;
       const allowClamp = eraserTool === "lasso";
       const pt = clientToSource(e.clientX, e.clientY, allowClamp);
@@ -336,8 +336,8 @@ export default function CropPreview({
     [eraserActive, eraserTool, brushSize, selectedImage, clientToSource, getOrCreateMask, dispatch, drawBrushOnCanvas],
   );
 
-  const handleEraserMouseMove = useCallback(
-    (e: React.MouseEvent) => {
+  const handleEraserPointerMove = useCallback(
+    (e: React.PointerEvent) => {
       if (!erasingRef.current || !selectedImage?.id || !selectedImage.editState) return;
       const allowClamp = eraserTool === "lasso";
       const pt = clientToSource(e.clientX, e.clientY, allowClamp);
@@ -358,7 +358,7 @@ export default function CropPreview({
     [eraserTool, brushSize, selectedImage, clientToSource, drawLassoOverlay, drawBrushOnCanvas],
   );
 
-  const handleEraserMouseUp = useCallback(() => {
+  const handleEraserPointerUp = useCallback(() => {
     if (!erasingRef.current || !selectedImage?.id || !selectedImage.editState) return;
     erasingRef.current = false;
 
@@ -403,40 +403,44 @@ export default function CropPreview({
     brushPointsRef.current = [];
   }, [eraserTool, selectedImage, getOrCreateMask, dispatch]);
 
-  // Mouse handlers — direct DOM manipulation for 60fps loupe tracking
-  const handleMouseMove = useCallback(
-    (e: React.MouseEvent) => {
+  // Pointer handlers — direct DOM manipulation for 60fps loupe tracking
+  const handlePointerMove = useCallback(
+    (e: React.PointerEvent) => {
       if (eraserActive) {
-        handleEraserMouseMove(e);
+        handleEraserPointerMove(e);
         return;
       }
       if (!loupeVisible) setLoupeVisible(true);
       drawLoupe(e.clientX, e.clientY);
     },
-    [eraserActive, handleEraserMouseMove, loupeVisible, drawLoupe],
+    [eraserActive, handleEraserPointerMove, loupeVisible, drawLoupe],
   );
 
-  const handleMouseLeave = useCallback(() => {
+  const handlePointerLeave = useCallback(() => {
     setLoupeVisible(false);
     if (erasingRef.current) {
-      handleEraserMouseUp();
+      handleEraserPointerUp();
     }
-  }, [handleEraserMouseUp]);
+  }, [handleEraserPointerUp]);
 
   // Build a circular cursor matching the brush size in display coordinates
-  const brushCursor = (() => {
-    if (!eraserActive || eraserTool !== "brush") return "crosshair";
-    const info = scaleInfoRef.current;
-    if (!info) return "crosshair";
+  const [cursorScale, setCursorScale] = useState(1);
+  useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return "crosshair";
-    const displayScale = canvas.getBoundingClientRect().width / info.srcW;
-    const r = Math.max(2, Math.round(brushSize * displayScale));
+    const info = scaleInfoRef.current;
+    if (canvas && info && info.srcW > 0) {
+      setCursorScale(canvas.getBoundingClientRect().width / info.srcW);
+    }
+  }, [selectedImage?.cropCanvas, selectedImage?.editState?.rotation]);
+
+  const brushCursor = useMemo(() => {
+    if (!eraserActive || eraserTool !== "brush") return "crosshair";
+    const r = Math.max(2, Math.round(brushSize * cursorScale));
     const size = r * 2 + 2;
     const half = size / 2;
     const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='${size}' height='${size}'><circle cx='${half}' cy='${half}' r='${r}' fill='none' stroke='white' stroke-width='1.5'/><circle cx='${half}' cy='${half}' r='${r}' fill='none' stroke='black' stroke-width='0.5'/></svg>`;
     return `url("data:image/svg+xml,${encodeURIComponent(svg)}") ${half} ${half}, crosshair`;
-  })();
+  }, [eraserActive, eraserTool, brushSize, cursorScale]);
 
   if (!selectedImage || selectedImage.status !== "ready") {
     return (
@@ -453,14 +457,14 @@ export default function CropPreview({
   return (
     <div
       ref={containerRef}
-      className="flex-1 flex items-center justify-center p-4 bg-[var(--bg-secondary)] overflow-hidden relative"
-      onMouseMove={handleMouseMove}
-      onMouseDown={eraserActive ? handleEraserMouseDown : undefined}
-      onMouseUp={eraserActive ? handleEraserMouseUp : undefined}
-      onMouseLeave={handleMouseLeave}
-      style={{ cursor: eraserActive ? brushCursor : undefined }}
+      className="flex-1 flex items-center justify-center p-4 preview-bg overflow-hidden relative"
+      onPointerMove={handlePointerMove}
+      onPointerDown={eraserActive ? handleEraserPointerDown : undefined}
+      onPointerUp={eraserActive ? handleEraserPointerUp : undefined}
+      onPointerLeave={handlePointerLeave}
+      style={{ cursor: eraserActive ? brushCursor : undefined, touchAction: eraserActive ? "none" : undefined }}
     >
-      <canvas ref={canvasRef} />
+      <canvas ref={canvasRef} aria-label="Crop preview" />
       {/* Lasso processing spinner */}
       {lassoProcessing && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/40 z-20">
@@ -488,7 +492,7 @@ export default function CropPreview({
           opacity: loupeVisible && !eraserActive ? 1 : 0,
           transition: "opacity 150ms",
           border: "2px solid rgba(255,255,255,0.15)",
-          background: "#111",
+          background: "var(--bg-secondary)",
         }}
       />
     </div>

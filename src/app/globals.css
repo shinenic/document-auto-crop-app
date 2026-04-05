@@ -9,7 +9,7 @@
   /* Text — 3-level hierarchy */
   --text-primary: #e8e8ed;
   --text-secondary: #9d9daa;
-  --text-muted: #5c5c6a;
+  --text-muted: #7e7e90;
   /* Accent */
   --accent: #4dd4b4;
   --accent-hover: #6aeaca;
@@ -73,6 +73,18 @@ input[type="range"]:disabled::-webkit-slider-thumb {
   opacity: 0.25;
 }
 
+/* Preview checkerboard background */
+.preview-bg {
+  background-color: #1a1a20;
+  background-image:
+    linear-gradient(45deg, #15151a 25%, transparent 25%),
+    linear-gradient(-45deg, #15151a 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #15151a 75%),
+    linear-gradient(-45deg, transparent 75%, #15151a 75%);
+  background-size: 16px 16px;
+  background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
+}
+
 /* Panel depth */
 .panel-inset {
   box-shadow: inset 1px 0 0 rgba(255,255,255,0.02);
@@ -82,4 +94,13 @@ input[type="range"]:disabled::-webkit-slider-thumb {
 @keyframes fadeInUp {
   from { opacity: 0; transform: translate(-50%, calc(100% + 16px)); }
   to { opacity: 1; transform: translate(-50%, calc(100% + 8px)); }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
