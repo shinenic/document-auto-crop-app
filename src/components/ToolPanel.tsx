@@ -331,6 +331,7 @@ export default function ToolPanel({
       {/* Edge Curves — spatial layout */}
       <div>
         <SectionHeader title="Edge Curves" />
+        <p className="text-[10px] text-[var(--text-muted)] mb-1.5 px-0.5 leading-snug">Click to toggle between straight line and bezier curve for each edge</p>
         {(() => {
           const EdgeBtn = ({ idx }: { idx: number }) => {
             const arc = sel?.editState?.edgeFits[idx]?.isArc ?? false;
