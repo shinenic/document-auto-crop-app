@@ -11,7 +11,7 @@ const LOUPE_ZOOM_CP = 1.8;
 
 // Canvas colors — mirror design tokens (canvas API can't read CSS vars)
 const CANVAS_BG = "#111115";        // --bg-secondary
-const EDGE_STROKE = "#4dd4b4";      // --accent
+const EDGE_STROKE = "rgba(255, 180, 60, 0.7)";  // warm orange, contrast with teal mask
 const GUIDE_STROKE = "rgba(100, 150, 255, 0.6)";
 const CP_FILL = "rgba(77, 212, 180, 0.4)";         // accent-derived
 const CP_FILL_SEL = "rgba(77, 212, 180, 0.7)";
@@ -126,7 +126,7 @@ export default function QuadEditor({ onDragStart, onDragEnd }: Props) {
 
     const sx = imgW / maskWidth;
     const sy = imgH / maskHeight;
-    const lw = Math.max(2, Math.round(imgW / 250));
+    const lw = Math.max(1.5, Math.round(imgW / 350));
     const cornerR = Math.max(10, Math.round(imgW / 45));
     const cornerRSel = Math.max(14, Math.round(imgW / 30));
     const cpR = Math.max(6, Math.round(imgW / 80));
@@ -190,7 +190,7 @@ export default function QuadEditor({ onDragStart, onDragEnd }: Props) {
       ctx.fillStyle = sel ? CORNER_FILL_SEL : CORNER_FILL;
       ctx.fill();
       ctx.strokeStyle = "#fff";
-      ctx.lineWidth = sel ? 4 : 3;
+      ctx.lineWidth = sel ? 6 : 5;
       ctx.stroke();
     }
   }, [baseCanvas, editState, selected, imgW, imgH, canW, canH, padX, padY, maskWidth, maskHeight]);
@@ -244,9 +244,9 @@ export default function QuadEditor({ onDragStart, onDragEnd }: Props) {
         setSelected({ type: bestPt.type, edgeIdx: bestPt.edgeIdx });
         setDragging(true);
         dragStartRef.current = false;
-        dragPosRef.current = maskToCanvas(mx, my);
         // Store offset: cursor position minus point position
         dragOffsetRef.current = [mx - bestPt.pos[0], my - bestPt.pos[1]];
+        dragPosRef.current = maskToCanvas(bestPt.pos[0], bestPt.pos[1]);
         // Place loupe at diagonal opposite corner
         const left = mx < maskWidth / 2;
         const top = my < maskHeight / 2;
@@ -272,7 +272,7 @@ export default function QuadEditor({ onDragStart, onDragEnd }: Props) {
         onDragStart();
       }
 
-      dragPosRef.current = maskToCanvas(rawMx, rawMy);
+      dragPosRef.current = maskToCanvas(mx, my);
 
       const { type, edgeIdx } = selected;
       if (type === "corner") {
