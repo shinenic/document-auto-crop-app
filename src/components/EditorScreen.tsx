@@ -31,7 +31,7 @@ export default function EditorScreen() {
 
   const [eraserActive, setEraserActive] = useState(false);
   const [eraserTool, setEraserTool] = useState<"brush" | "lasso">("brush");
-  const [brushSize, setBrushSize] = useState(20);
+  const [brushSize, setBrushSize] = useState(50);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [previewBg, setPreviewBg] = useState<"checker" | "black" | "white" | "gray">("checker");
 
