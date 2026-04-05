@@ -81,9 +81,9 @@ function DropdownMenu({
         <div ref={menuRef} role="menu" className="absolute right-0 top-full mt-1 bg-[var(--bg-elevated)] border border-[var(--border)] rounded-lg shadow-xl z-50 py-1 overflow-hidden" style={{ minWidth }}
           onKeyDown={handleKeyDown}
           onClick={(e) => {
-            // Auto-close when a MenuItem (button) is clicked
+            // Auto-close only when a MenuItem (role="menuitem") is clicked
             const t = e.target as HTMLElement;
-            if (t.closest("button:not(:disabled)") && !t.closest("select") && !t.closest("input")) {
+            if (t.closest("[role='menuitem']:not(:disabled)")) {
               setTimeout(() => setOpen(false), 100);
             }
           }}
