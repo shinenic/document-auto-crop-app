@@ -463,12 +463,13 @@ export default function CropPreview({
         backgroundImage: "linear-gradient(45deg, #15151a 25%, transparent 25%), linear-gradient(-45deg, #15151a 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #15151a 75%), linear-gradient(-45deg, transparent 75%, #15151a 75%)",
         backgroundSize: "16px 16px",
         backgroundPosition: "0 0, 0 8px, 8px -8px, -8px 0",
+        cursor: eraserActive ? brushCursor : undefined,
+        touchAction: eraserActive ? "none" : undefined,
       }}
       onPointerMove={handlePointerMove}
       onPointerDown={eraserActive ? handleEraserPointerDown : undefined}
       onPointerUp={eraserActive ? handleEraserPointerUp : undefined}
       onPointerLeave={handlePointerLeave}
-      style={{ cursor: eraserActive ? brushCursor : undefined, touchAction: eraserActive ? "none" : undefined }}
     >
       <canvas ref={canvasRef} aria-label="Crop preview" />
       {/* Lasso processing spinner */}
