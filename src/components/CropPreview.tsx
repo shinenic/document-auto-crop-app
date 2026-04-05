@@ -261,6 +261,9 @@ export default function CropPreview({
     canvas.height = Math.round(cssH * dpr);
     canvas.style.width = `${cssW}px`;
     canvas.style.height = `${cssH}px`;
+    // Center the absolute-positioned canvas
+    canvas.style.left = `${Math.round((rect.width - cssW) / 2)}px`;
+    canvas.style.top = `${Math.round((rect.height - cssH) / 2)}px`;
 
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
@@ -457,7 +460,7 @@ export default function CropPreview({
   return (
     <div
       ref={containerRef}
-      className="flex-1 flex items-center justify-center p-4 overflow-hidden relative"
+      className="flex-1 overflow-hidden relative p-4"
       style={{
         ...(previewBg === "checker" ? {
           backgroundColor: "#3a3a44",
@@ -475,7 +478,7 @@ export default function CropPreview({
       onPointerUp={eraserActive ? handleEraserPointerUp : undefined}
       onPointerLeave={handlePointerLeave}
     >
-      <canvas ref={canvasRef} aria-label="Crop preview" style={{ maxWidth: "100%", maxHeight: "100%" }} />
+      <canvas ref={canvasRef} aria-label="Crop preview" style={{ position: "absolute" }} />
       {/* Lasso processing spinner */}
       {lassoProcessing && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/40 z-20">
