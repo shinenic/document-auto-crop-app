@@ -37,6 +37,8 @@ export default function QuadEditor({ onDragStart, onDragEnd }: Props) {
   const [baseCanvas, setBaseCanvas] = useState<HTMLCanvasElement | null>(null);
   const dragStartRef = useRef(false);
   const dragPosRef = useRef<[number, number]>([0, 0]);
+  // Offset between cursor and point position at pointerDown
+  const dragOffsetRef = useRef<[number, number]>([0, 0]);
 
   useEffect(() => {
     if (!selectedImage?.originalCanvas || !selectedImage.mask) return;
@@ -243,6 +245,8 @@ export default function QuadEditor({ onDragStart, onDragEnd }: Props) {
         setDragging(true);
         dragStartRef.current = false;
         dragPosRef.current = maskToCanvas(mx, my);
+        // Store offset: cursor position minus point position
+        dragOffsetRef.current = [mx - bestPt.pos[0], my - bestPt.pos[1]];
         // Place loupe at diagonal opposite corner
         const left = mx < maskWidth / 2;
         const top = my < maskHeight / 2;
@@ -257,7 +261,10 @@ export default function QuadEditor({ onDragStart, onDragEnd }: Props) {
   const handlePointerMove = useCallback(
     (e: React.PointerEvent) => {
       if (!dragging || !selected || !editState || !selectedImage) return;
-      const [mx, my] = toMaskFromPointer(e);
+      const [rawMx, rawMy] = toMaskFromPointer(e);
+      // Apply offset so the point moves by delta, not snapping to cursor
+      const mx = rawMx - dragOffsetRef.current[0];
+      const my = rawMy - dragOffsetRef.current[1];
 
       if (!dragStartRef.current) {
         dispatch({ type: "PUSH_HISTORY", id: selectedImage.id });
@@ -265,7 +272,7 @@ export default function QuadEditor({ onDragStart, onDragEnd }: Props) {
         onDragStart();
       }
 
-      dragPosRef.current = maskToCanvas(mx, my);
+      dragPosRef.current = maskToCanvas(rawMx, rawMy);
 
       const { type, edgeIdx } = selected;
       if (type === "corner") {
