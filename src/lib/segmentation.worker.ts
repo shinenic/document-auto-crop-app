@@ -1,7 +1,8 @@
 import * as ort from "onnxruntime-web";
 
 const INPUT_SIZE = 256;
-const MODEL_PATH = "/model/fairscan-segmentation-model.onnx";
+const BASE_PATH = self.location.pathname.replace(/\/_next\/.*$/, "");
+const MODEL_PATH = `${BASE_PATH}/model/fairscan-segmentation-model.onnx`;
 
 let session: ort.InferenceSession | null = null;
 
