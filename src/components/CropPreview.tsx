@@ -207,10 +207,6 @@ export default function CropPreview({
     const container = containerRef.current;
     if (!canvas || !container) return;
 
-    // Reset canvas CSS size before measuring container so it doesn't inflate the layout
-    canvas.style.width = "0";
-    canvas.style.height = "0";
-
     const rect = container.getBoundingClientRect();
     if (rect.width === 0 || rect.height === 0) return;
 
@@ -287,11 +283,9 @@ export default function CropPreview({
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
-    const redraw = () => drawRef.current();
-    const ro = new ResizeObserver(redraw);
+    const ro = new ResizeObserver(() => drawRef.current());
     ro.observe(el);
-    window.addEventListener("resize", redraw);
-    return () => { ro.disconnect(); window.removeEventListener("resize", redraw); };
+    return () => ro.disconnect();
   }, []);
 
   // Draw brush strokes directly onto the display canvas (no React state update)
@@ -463,7 +457,7 @@ export default function CropPreview({
   return (
     <div
       ref={containerRef}
-      className="flex-1 flex items-center justify-center p-4 overflow-hidden relative"
+      className="flex-1 flex items-center justify-center p-4 overflow-hidden relative min-w-0 min-h-0"
       style={{
         ...(previewBg === "checker" ? {
           backgroundColor: "#3a3a44",
@@ -481,7 +475,7 @@ export default function CropPreview({
       onPointerUp={eraserActive ? handleEraserPointerUp : undefined}
       onPointerLeave={handlePointerLeave}
     >
-      <canvas ref={canvasRef} aria-label="Crop preview" />
+      <canvas ref={canvasRef} aria-label="Crop preview" className="max-w-full max-h-full" />
       {/* Lasso processing spinner */}
       {lassoProcessing && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/40 z-20">

@@ -333,8 +333,8 @@ export default function EditorScreen() {
               onDragEnd={handleDragEnd}
             />
           </div>
-          <div className="flex-1 flex flex-col min-w-0">
-            <div className="px-3 py-1.5 border-b border-[var(--border)] bg-[var(--bg-secondary)]">
+          <div className="flex-1 flex flex-col min-w-0 min-h-0">
+            <div className="px-3 py-1.5 border-b border-[var(--border)] bg-[var(--bg-secondary)] shrink-0">
               <h4 className="text-[11px] uppercase tracking-[0.06em] text-[var(--text-muted)] font-semibold">
                 Preview
               </h4>
