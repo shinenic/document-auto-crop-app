@@ -287,9 +287,11 @@ export default function CropPreview({
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
-    const ro = new ResizeObserver(() => drawRef.current());
+    const redraw = () => drawRef.current();
+    const ro = new ResizeObserver(redraw);
     ro.observe(el);
-    return () => ro.disconnect();
+    window.addEventListener("resize", redraw);
+    return () => { ro.disconnect(); window.removeEventListener("resize", redraw); };
   }, []);
 
   // Draw brush strokes directly onto the display canvas (no React state update)
