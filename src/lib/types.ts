@@ -102,7 +102,7 @@ export interface AppState {
 // --- Selection ---
 
 export interface PointSelection {
-  type: "corner" | "cp1" | "cp2";
+  type: "corner" | "cp1" | "cp2" | "edge";
   edgeIdx: number;
 }
 

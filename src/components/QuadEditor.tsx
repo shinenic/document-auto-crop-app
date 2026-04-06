@@ -17,6 +17,9 @@ const CP_FILL = "rgba(77, 212, 180, 0.4)";         // accent-derived
 const CP_FILL_SEL = "rgba(77, 212, 180, 0.7)";
 const CORNER_FILL = "rgba(232, 85, 85, 0.15)";     // danger-derived
 const CORNER_FILL_SEL = "rgba(232, 85, 85, 0.35)";
+const EDGE_HANDLE_FILL = "rgba(255, 180, 60, 0.55)";
+const EDGE_HANDLE_FILL_SEL = "rgba(255, 180, 60, 0.8)";
+const EDGE_HANDLE_GLOW = "rgba(255, 180, 60, 0.3)";
 
 interface Props {
   onDragStart: () => void;
@@ -39,6 +42,11 @@ export default function QuadEditor({ onDragStart, onDragEnd }: Props) {
   const dragPosRef = useRef<[number, number]>([0, 0]);
   // Offset between cursor and point position at pointerDown
   const dragOffsetRef = useRef<[number, number]>([0, 0]);
+  // For edge drag: initial corners and midpoint when drag started
+  const edgeDragInitRef = useRef<{
+    corners: [[number, number], [number, number]];
+    midpoint: [number, number];
+  } | null>(null);
 
   useEffect(() => {
     if (!selectedImage?.originalCanvas || !selectedImage.mask) return;
@@ -180,6 +188,69 @@ export default function QuadEditor({ onDragStart, onDragEnd }: Props) {
       }
     }
 
+    // Draw edge midpoint handles for straight edges
+    const ehR = Math.max(8, Math.round(imgW / 60));        // between cpR and cornerR
+    const ehRSel = Math.max(11, Math.round(imgW / 45));
+    for (let i = 0; i < 4; i++) {
+      const fit = edgeFits[i];
+      if (fit.isArc) continue;
+      const start = corners[i], end = corners[(i + 1) % 4];
+      const midX = ((start[0] + end[0]) / 2) * sx;
+      const midY = ((start[1] + end[1]) / 2) * sy;
+      const sel = selected?.type === "edge" && selected?.edgeIdx === i;
+      const r = sel ? ehRSel : ehR;
+      const isVert = i === 0 || i === 2;
+      // Pill dimensions: elongated along movement axis
+      const pillW = isVert ? r * 1.4 : r * 2.4;
+      const pillH = isVert ? r * 2.4 : r * 1.4;
+      const pillR = Math.min(pillW, pillH) * 0.45; // corner radius
+
+      // Outer glow
+      ctx.save();
+      ctx.shadowColor = EDGE_HANDLE_GLOW;
+      ctx.shadowBlur = r * 0.8;
+      ctx.beginPath();
+      ctx.roundRect(midX - pillW / 2, midY - pillH / 2, pillW, pillH, pillR);
+      ctx.fillStyle = sel ? EDGE_HANDLE_FILL_SEL : EDGE_HANDLE_FILL;
+      ctx.fill();
+      ctx.restore();
+
+      // Border
+      ctx.beginPath();
+      ctx.roundRect(midX - pillW / 2, midY - pillH / 2, pillW, pillH, pillR);
+      ctx.strokeStyle = sel ? "#fff" : "rgba(255,255,255,0.7)";
+      ctx.lineWidth = Math.max(1.5, lw * 0.5);
+      ctx.stroke();
+
+      // Directional arrows — larger and bolder
+      const aLen = (isVert ? pillH : pillW) * 0.34;
+      const aHead = r * 0.38;
+      const aStroke = Math.max(2, lw * 0.55);
+      ctx.strokeStyle = "#fff";
+      ctx.lineWidth = aStroke;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.beginPath();
+      if (isVert) {
+        // Shaft
+        ctx.moveTo(midX, midY - aLen); ctx.lineTo(midX, midY + aLen);
+        // Up arrowhead
+        ctx.moveTo(midX - aHead, midY - aLen + aHead); ctx.lineTo(midX, midY - aLen); ctx.lineTo(midX + aHead, midY - aLen + aHead);
+        // Down arrowhead
+        ctx.moveTo(midX - aHead, midY + aLen - aHead); ctx.lineTo(midX, midY + aLen); ctx.lineTo(midX + aHead, midY + aLen - aHead);
+      } else {
+        // Shaft
+        ctx.moveTo(midX - aLen, midY); ctx.lineTo(midX + aLen, midY);
+        // Left arrowhead
+        ctx.moveTo(midX - aLen + aHead, midY - aHead); ctx.lineTo(midX - aLen, midY); ctx.lineTo(midX - aLen + aHead, midY + aHead);
+        // Right arrowhead
+        ctx.moveTo(midX + aLen - aHead, midY - aHead); ctx.lineTo(midX + aLen, midY); ctx.lineTo(midX + aLen - aHead, midY + aHead);
+      }
+      ctx.stroke();
+      ctx.lineCap = "butt";
+      ctx.lineJoin = "miter";
+    }
+
     // Draw corners
     for (let i = 0; i < 4; i++) {
       const sel = selected?.type === "corner" && selected?.edgeIdx === i;
@@ -200,7 +271,7 @@ export default function QuadEditor({ onDragStart, onDragEnd }: Props) {
   // --- Hit detection ---
   const getAllPoints = useCallback(() => {
     if (!editState) return [];
-    const pts: { type: "corner" | "cp1" | "cp2"; edgeIdx: number; pos: [number, number] }[] = [];
+    const pts: { type: "corner" | "cp1" | "cp2" | "edge"; edgeIdx: number; pos: [number, number] }[] = [];
     for (let i = 0; i < 4; i++) {
       pts.push({ type: "corner", edgeIdx: i, pos: editState.corners[i] });
     }
@@ -208,6 +279,13 @@ export default function QuadEditor({ onDragStart, onDragEnd }: Props) {
       if (!editState.edgeFits[i].isArc) continue;
       pts.push({ type: "cp1", edgeIdx: i, pos: editState.edgeFits[i].cp1 });
       pts.push({ type: "cp2", edgeIdx: i, pos: editState.edgeFits[i].cp2 });
+    }
+    // Edge midpoints for straight edges (lower priority — listed last)
+    for (let i = 0; i < 4; i++) {
+      if (editState.edgeFits[i].isArc) continue;
+      const s = editState.corners[i];
+      const e = editState.corners[(i + 1) % 4];
+      pts.push({ type: "edge", edgeIdx: i, pos: [(s[0] + e[0]) / 2, (s[1] + e[1]) / 2] });
     }
     return pts;
   }, [editState]);
@@ -247,6 +325,20 @@ export default function QuadEditor({ onDragStart, onDragEnd }: Props) {
         // Store offset: cursor position minus point position
         dragOffsetRef.current = [mx - bestPt.pos[0], my - bestPt.pos[1]];
         dragPosRef.current = maskToCanvas(bestPt.pos[0], bestPt.pos[1]);
+        // For edge drag, store initial corner positions
+        if (bestPt.type === "edge") {
+          const si = bestPt.edgeIdx;
+          const ei = (bestPt.edgeIdx + 1) % 4;
+          edgeDragInitRef.current = {
+            corners: [
+              [...editState.corners[si]] as [number, number],
+              [...editState.corners[ei]] as [number, number],
+            ],
+            midpoint: [...bestPt.pos] as [number, number],
+          };
+        } else {
+          edgeDragInitRef.current = null;
+        }
         // Place loupe at diagonal opposite corner
         const left = mx < maskWidth / 2;
         const top = my < maskHeight / 2;
@@ -296,7 +388,43 @@ export default function QuadEditor({ onDragStart, onDragEnd }: Props) {
           id: selectedImage.id,
           editState: { ...editState, corners, edgeFits },
         });
-      } else {
+      } else if (type === "edge") {
+        const init = edgeDragInitRef.current;
+        if (!init) return;
+        // Top/bottom edges → vertical only; left/right → horizontal only
+        const isVert = edgeIdx === 0 || edgeIdx === 2;
+        const dx = isVert ? 0 : mx - init.midpoint[0];
+        const dy = isVert ? my - init.midpoint[1] : 0;
+
+        dragPosRef.current = maskToCanvas(init.midpoint[0] + dx, init.midpoint[1] + dy);
+
+        const startIdx = edgeIdx;
+        const endIdx = (edgeIdx + 1) % 4;
+        const corners = editState.corners.map((c) => [...c] as [number, number]);
+        corners[startIdx] = [init.corners[0][0] + dx, init.corners[0][1] + dy];
+        corners[endIdx] = [init.corners[1][0] + dx, init.corners[1][1] + dy];
+
+        const edgeFits = editState.edgeFits.map((f) => ({
+          cp1: [...f.cp1] as [number, number],
+          cp2: [...f.cp2] as [number, number],
+          isArc: f.isArc,
+        }));
+        // Recalc CPs for all straight edges adjacent to both moved corners
+        const affected = new Set([startIdx, (startIdx + 3) % 4, endIdx, (endIdx + 3) % 4]);
+        for (const adj of affected) {
+          if (!edgeFits[adj].isArc) {
+            const s = corners[adj];
+            const e = corners[(adj + 1) % 4];
+            edgeFits[adj].cp1 = [s[0] + (e[0] - s[0]) / 3, s[1] + (e[1] - s[1]) / 3];
+            edgeFits[adj].cp2 = [s[0] + (2 * (e[0] - s[0])) / 3, s[1] + (2 * (e[1] - s[1])) / 3];
+          }
+        }
+        dispatch({
+          type: "SET_EDIT_STATE",
+          id: selectedImage.id,
+          editState: { ...editState, corners, edgeFits },
+        });
+      } else if (type === "cp1" || type === "cp2") {
         const edgeFits = editState.edgeFits.map((f) => ({
           cp1: [...f.cp1] as [number, number],
           cp2: [...f.cp2] as [number, number],
@@ -339,7 +467,14 @@ export default function QuadEditor({ onDragStart, onDragEnd }: Props) {
         ref={canvasRef}
         aria-label="Document boundary editor — drag corners and control points to adjust crop"
         className="max-w-full max-h-full"
-        style={{ cursor: dragging ? "grabbing" : "pointer", aspectRatio: `${canW} / ${canH}`, touchAction: "none" }}
+        style={{
+          cursor: dragging
+            ? selected?.type === "edge"
+              ? (selected.edgeIdx === 0 || selected.edgeIdx === 2 ? "ns-resize" : "ew-resize")
+              : "grabbing"
+            : "pointer",
+          aspectRatio: `${canW} / ${canH}`, touchAction: "none",
+        }}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
