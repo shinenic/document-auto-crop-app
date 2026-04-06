@@ -350,6 +350,24 @@ export default function QuadEditor({ onDragStart, onDragEnd }: Props) {
     [editState, selectedImage, toMaskFromPointer, getAllPoints, getScale, imgW, maskWidth, maskHeight, maskToCanvas],
   );
 
+  // Clamp helpers: corners stay within image, CPs stay within container (padding area)
+  const clampToImage = useCallback(
+    (x: number, y: number): [number, number] => [
+      Math.max(0, Math.min(maskWidth, x)),
+      Math.max(0, Math.min(maskHeight, y)),
+    ],
+    [maskWidth, maskHeight],
+  );
+  const padMaskX = padX / (imgW / maskWidth);
+  const padMaskY = padY / (imgH / maskHeight);
+  const clampToContainer = useCallback(
+    (x: number, y: number): [number, number] => [
+      Math.max(-padMaskX, Math.min(maskWidth + padMaskX, x)),
+      Math.max(-padMaskY, Math.min(maskHeight + padMaskY, y)),
+    ],
+    [maskWidth, maskHeight, padMaskX, padMaskY],
+  );
+
   const handlePointerMove = useCallback(
     (e: React.PointerEvent) => {
       if (!dragging || !selected || !editState || !selectedImage) return;
@@ -369,7 +387,8 @@ export default function QuadEditor({ onDragStart, onDragEnd }: Props) {
       const { type, edgeIdx } = selected;
       if (type === "corner") {
         const corners = editState.corners.map((c) => [...c] as [number, number]);
-        corners[edgeIdx] = [mx, my];
+        const [cx, cy] = clampToImage(mx, my);
+        corners[edgeIdx] = [cx, cy];
         const edgeFits = editState.edgeFits.map((f) => ({
           cp1: [...f.cp1] as [number, number],
           cp2: [...f.cp2] as [number, number],
@@ -401,8 +420,8 @@ export default function QuadEditor({ onDragStart, onDragEnd }: Props) {
         const startIdx = edgeIdx;
         const endIdx = (edgeIdx + 1) % 4;
         const corners = editState.corners.map((c) => [...c] as [number, number]);
-        corners[startIdx] = [init.corners[0][0] + dx, init.corners[0][1] + dy];
-        corners[endIdx] = [init.corners[1][0] + dx, init.corners[1][1] + dy];
+        corners[startIdx] = clampToImage(init.corners[0][0] + dx, init.corners[0][1] + dy);
+        corners[endIdx] = clampToImage(init.corners[1][0] + dx, init.corners[1][1] + dy);
 
         const edgeFits = editState.edgeFits.map((f) => ({
           cp1: [...f.cp1] as [number, number],
@@ -430,7 +449,7 @@ export default function QuadEditor({ onDragStart, onDragEnd }: Props) {
           cp2: [...f.cp2] as [number, number],
           isArc: f.isArc,
         }));
-        edgeFits[edgeIdx][type] = [mx, my];
+        edgeFits[edgeIdx][type] = clampToContainer(mx, my);
         dispatch({
           type: "SET_EDIT_STATE",
           id: selectedImage.id,
@@ -438,7 +457,7 @@ export default function QuadEditor({ onDragStart, onDragEnd }: Props) {
         });
       }
     },
-    [dragging, selected, editState, selectedImage, toMaskFromPointer, dispatch, onDragStart, maskToCanvas],
+    [dragging, selected, editState, selectedImage, toMaskFromPointer, dispatch, onDragStart, maskToCanvas, clampToImage, clampToContainer],
   );
 
   const handlePointerUp = useCallback(() => {

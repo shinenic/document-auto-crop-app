@@ -31,7 +31,18 @@ export default function UploadScreen() {
   );
 
   return (
-    <div className="h-dvh flex flex-col items-center justify-center p-8 relative overflow-hidden">
+    <div
+      className={`h-dvh flex flex-col items-center justify-center p-8 relative overflow-hidden cursor-pointer transition-colors duration-200 ${
+        dragOver ? "bg-[var(--accent-muted)]" : ""
+      }`}
+      onDrop={handleDrop}
+      onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+      onDragLeave={() => setDragOver(false)}
+      onClick={() => fileInputRef.current?.click()}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); fileInputRef.current?.click(); } }}
+      role="button"
+      tabIndex={0}
+    >
       {/* Subtle staff lines background */}
       <div className="absolute inset-0 pointer-events-none opacity-[0.03]" aria-hidden>
         <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
@@ -46,7 +57,21 @@ export default function UploadScreen() {
         </svg>
       </div>
 
-      <div className="text-center mb-10 relative">
+      {/* Drag-over overlay — full-screen scrim + border + prominent label */}
+      <div className={`absolute inset-0 pointer-events-none z-10 transition-opacity duration-150 ${dragOver ? "opacity-100" : "opacity-0"}`}>
+        <div className="absolute inset-0 bg-[var(--accent)]/8" />
+        <div className="absolute inset-4 rounded-xl border-2 border-dashed border-[var(--accent)]" />
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="flex flex-col items-center gap-3 px-8 py-6 rounded-2xl bg-[var(--bg-secondary)]/90 border border-[var(--accent)]/30 shadow-2xl backdrop-blur-sm">
+            <svg className="w-10 h-10 text-[var(--accent)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+            </svg>
+            <p className="text-[16px] font-semibold text-[var(--accent)]">Drop to upload</p>
+          </div>
+        </div>
+      </div>
+
+      <div className={`text-center mb-10 relative transition-opacity duration-150 ${dragOver ? "opacity-30" : ""}`}>
         <h1 className="text-3xl font-semibold tracking-tight mb-3 text-[var(--text-primary)]">
           Document Auto-Crop
         </h1>
@@ -56,24 +81,13 @@ export default function UploadScreen() {
         </p>
       </div>
 
-      <div
-        role="button"
-        tabIndex={0}
-        className={`
-          relative w-full max-w-lg aspect-[4/3] rounded-xl border-2 border-dashed
-          flex flex-col items-center justify-center gap-5 cursor-pointer
-          transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]
-          ${
-            dragOver
-              ? "border-[var(--accent)] bg-[var(--accent-muted)] scale-[1.01]"
-              : "border-[var(--border-hover)] hover:border-[var(--accent)]/40 bg-[var(--bg-secondary)]"
-          }
-        `}
-        onDrop={handleDrop}
-        onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-        onDragLeave={() => setDragOver(false)}
-        onClick={() => fileInputRef.current?.click()}
-        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); fileInputRef.current?.click(); } }}
+      <div className={`relative w-full max-w-lg aspect-[4/3] rounded-xl border-2 border-dashed
+        flex flex-col items-center justify-center gap-5
+        transition-all duration-150
+        ${dragOver
+          ? "opacity-30 border-transparent bg-transparent"
+          : "border-[var(--border-hover)] hover:border-[var(--accent)]/40 bg-[var(--bg-secondary)]"
+        }`}
       >
         <div className={`w-14 h-14 rounded-xl flex items-center justify-center transition-colors ${dragOver ? "bg-[var(--accent)]/15" : "bg-[var(--bg-tertiary)]"}`}>
           <svg className={`w-7 h-7 transition-colors ${dragOver ? "text-[var(--accent)]" : "text-[var(--text-muted)]"}`}

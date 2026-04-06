@@ -35,10 +35,11 @@ export default function EditorScreen() {
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [previewBg, setPreviewBg] = useState<"checker" | "black" | "white" | "gray">("checker");
 
-  // Exit eraser mode when switching images
+  // Exit eraser mode when switching images or leaving B&W filter
+  const currentFilterType = getSelectedImage(state)?.editState?.filterConfig?.type;
   useEffect(() => {
     setEraserActive(false);
-  }, [state.selectedImageId]);
+  }, [state.selectedImageId, currentFilterType]);
 
   // Eraser hotkeys: E=toggle, B=brush, L=lasso, [/]=brush size
   useEffect(() => {

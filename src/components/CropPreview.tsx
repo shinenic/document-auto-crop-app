@@ -99,6 +99,8 @@ export default function CropPreview({
     overlay.height = Math.round(rect.height * dpr);
     overlay.style.width = `${rect.width}px`;
     overlay.style.height = `${rect.height}px`;
+    overlay.style.left = canvas.style.left;
+    overlay.style.top = canvas.style.top;
 
     const ctx = overlay.getContext("2d");
     if (!ctx) return;
@@ -398,18 +400,20 @@ export default function CropPreview({
         setLassoProcessing(true);
         const imgId = selectedImage.id;
         const editState = selectedImage.editState;
-        // Defer to next frame so spinner renders before heavy computation
+        // Double-rAF ensures the spinner paints before blocking computation
         requestAnimationFrame(() => {
-          const mask = getOrCreateMask();
-          if (mask) {
-            fillLassoRegion(mask, points);
-            dispatch({
-              type: "SET_EDIT_STATE",
-              id: imgId,
-              editState: { ...editState, eraseMask: mask },
-            });
-          }
-          setLassoProcessing(false);
+          requestAnimationFrame(() => {
+            const mask = getOrCreateMask();
+            if (mask) {
+              fillLassoRegion(mask, points);
+              dispatch({
+                type: "SET_EDIT_STATE",
+                id: imgId,
+                editState: { ...editState, eraseMask: mask },
+              });
+            }
+            setLassoProcessing(false);
+          });
         });
       }
       lassoPointsRef.current = [];

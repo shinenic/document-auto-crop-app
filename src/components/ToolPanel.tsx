@@ -294,37 +294,36 @@ export default function ToolPanel({
       </div>
 
       {/* Eraser */}
-      {isFilterActive && sel?.filteredCanvas && (
-        <>
-          <div className="h-px bg-[var(--border)]" />
-          <div>
-            <SectionHeader title="Eraser" />
-            <div className="flex flex-col gap-1">
-              <Btn icon={<IconEraser />} label={eraserActive ? "Exit Eraser" : "Eraser"} shortcut="E"
-                onClick={onToggleEraser} active={eraserActive} />
-              {eraserActive && (
-                <>
-                  <TogglePill
-                    options={[
-                      { label: "Brush", value: "brush", icon: <IconBrush /> },
-                      { label: "Lasso", value: "lasso", icon: <IconLasso /> },
-                    ]}
-                    value={eraserTool}
-                    onChange={(v) => onSetEraserTool(v as "brush" | "lasso")}
-                  />
-                  {eraserTool === "brush" && (
-                    <Slider label="Brush Size" value={brushSize} min={5} max={150} step={1}
-                      disabled={false} onPointerDown={() => {}} onChange={onSetBrushSize} />
-                  )}
-                  {sel?.editState?.eraseMask && (
-                    <Btn icon={<IconTrash />} label="Clear All" onClick={clearEraser} danger />
-                  )}
-                </>
+      <div className="h-px bg-[var(--border)]" />
+      <div>
+        <SectionHeader title="Eraser" />
+        <div className="flex flex-col gap-1">
+          {!isFilterActive && (
+            <p className="text-[10px] text-[var(--text-muted)] px-0.5 leading-snug mb-0.5">Requires B&W filter</p>
+          )}
+          <Btn icon={<IconEraser />} label={eraserActive ? "Exit Eraser" : "Eraser"} shortcut="E"
+            onClick={onToggleEraser} disabled={!isFilterActive || !sel?.filteredCanvas} active={eraserActive} />
+          {eraserActive && (
+            <>
+              <TogglePill
+                options={[
+                  { label: "Brush", value: "brush", icon: <IconBrush /> },
+                  { label: "Lasso", value: "lasso", icon: <IconLasso /> },
+                ]}
+                value={eraserTool}
+                onChange={(v) => onSetEraserTool(v as "brush" | "lasso")}
+              />
+              {eraserTool === "brush" && (
+                <Slider label="Brush Size" value={brushSize} min={5} max={150} step={1}
+                  disabled={false} onPointerDown={() => {}} onChange={onSetBrushSize} />
               )}
-            </div>
-          </div>
-        </>
-      )}
+              {sel?.editState?.eraseMask && (
+                <Btn icon={<IconTrash />} label="Clear All" onClick={clearEraser} danger />
+              )}
+            </>
+          )}
+        </div>
+      </div>
 
       <div className="h-px bg-[var(--border)]" />
 
