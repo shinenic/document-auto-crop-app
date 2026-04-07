@@ -402,7 +402,8 @@ export default function EditorScreen() {
               <kbd className="text-[10px] text-[var(--text-muted)] font-mono bg-[var(--bg-tertiary)] px-1.5 py-0.5 rounded">?</kbd>
             </div>
             {[
-              { group: "Navigation", keys: [["Arrow Up / Down", "Previous / Next image"], ["Ctrl+S", "Export current JPEG"]] },
+              { group: "File", keys: [["Ctrl+S", "Save Draft"], ["Ctrl+Shift+S", "Save Draft As"], ["Ctrl+O", "Open Draft"], ["Ctrl+E", "Export current JPEG"]] },
+              { group: "Navigation", keys: [["Arrow Up / Down", "Previous / Next image"]] },
               { group: "Editing", keys: [["Ctrl+Z", "Undo"], ["Ctrl+Shift+Z", "Redo"], ["R", "Rotate 90° CW"], ["Shift+R", "Rotate 90° CCW"]] },
               { group: "Eraser", keys: [["E", "Toggle eraser mode"], ["B", "Brush tool"], ["L", "Lasso tool"], ["[ / ]", "Brush size -/+"]] },
             ].map(({ group, keys }) => (
