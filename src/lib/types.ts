@@ -72,7 +72,7 @@ export type ImageStatus = "pending" | "processing" | "ready" | "error";
 
 export interface ImageEntry {
   id: string;
-  file: File;
+  file: File | null;
   fileName: string;
   originalCanvas: HTMLCanvasElement | null;
   mask: Uint8Array | null;
