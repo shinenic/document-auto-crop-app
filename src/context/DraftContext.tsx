@@ -137,7 +137,7 @@ export function DraftProvider({ children }: { children: ReactNode }) {
     return () => {
       if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
     };
-  }, [state.images, state.showMask, doSave]);
+  }, [state.images, state.showMask, state.screen, doSave]);
 
   const save = useCallback(async () => {
     if (!isSupported) return;
