@@ -62,7 +62,12 @@ export function DraftProvider({ children }: { children: ReactNode }) {
   const savedImageIdsRef = useRef<Set<string>>(new Set());
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const isSupported = typeof window !== "undefined" && "showDirectoryPicker" in window;
+  const [isSupported, setIsSupported] = useState(false);
+
+  // Defer browser feature detection to client to avoid hydration mismatch
+  useEffect(() => {
+    setIsSupported("showDirectoryPicker" in window);
+  }, []);
 
   const stateRef = useRef(state);
   stateRef.current = state;
