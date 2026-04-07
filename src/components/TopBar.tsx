@@ -3,6 +3,7 @@
 import { useRef, useCallback, useState, useEffect } from "react";
 import JSZip from "jszip";
 import { useApp } from "../context/AppContext";
+import { useDraft } from "../context/DraftContext";
 import { processImages } from "./imageProcessor";
 import { rotateCanvas } from "../lib/crop";
 import { exportPdf } from "../lib/pdfExport";
@@ -17,12 +18,14 @@ function DropdownMenu({
   children,
   disabled = false,
   accent = false,
+  menuTrigger = false,
   minWidth = 220,
 }: {
   label: string;
   children: React.ReactNode;
   disabled?: boolean;
   accent?: boolean;
+  menuTrigger?: boolean;
   minWidth?: number;
 }) {
   const [open, setOpen] = useState(false);
@@ -59,9 +62,13 @@ function DropdownMenu({
     }
   }, []);
 
-  const btnClass = accent
-    ? "px-3 py-1.5 text-xs font-medium rounded-lg bg-[var(--accent)] text-[var(--bg-primary)] hover:bg-[var(--accent-hover)] transition-colors disabled:opacity-40 flex items-center gap-1"
-    : "px-3 py-1.5 text-xs font-medium rounded-lg bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] transition-colors disabled:opacity-40 flex items-center gap-1";
+  const btnClass = menuTrigger
+    ? "px-2.5 py-1 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] rounded transition-colors"
+    : accent
+      ? "px-3 py-1.5 text-xs font-medium rounded-lg bg-[var(--accent)] text-[var(--bg-primary)] hover:bg-[var(--accent-hover)] transition-colors disabled:opacity-40 flex items-center gap-1"
+      : "px-3 py-1.5 text-xs font-medium rounded-lg bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] transition-colors disabled:opacity-40 flex items-center gap-1";
+
+  const alignClass = menuTrigger ? "left-0" : "right-0";
 
   return (
     <div ref={ref} className="relative">
@@ -73,12 +80,14 @@ function DropdownMenu({
         aria-expanded={open}
       >
         {label}
-        <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor" aria-hidden="true" className={`transition-transform ${open ? "rotate-180" : ""}`}>
-          <path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
+        {!menuTrigger && (
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor" aria-hidden="true" className={`transition-transform ${open ? "rotate-180" : ""}`}>
+            <path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        )}
       </button>
       {open && (
-        <div ref={menuRef} role="menu" className="absolute right-0 top-full mt-1 bg-[var(--bg-elevated)] border border-[var(--border)] rounded-lg shadow-xl z-50 py-1 overflow-hidden" style={{ minWidth }}
+        <div ref={menuRef} role="menu" className={`absolute ${alignClass} top-full mt-1 bg-[var(--bg-elevated)] border border-[var(--border)] rounded-lg shadow-xl z-50 py-1 overflow-hidden`} style={{ minWidth }}
           onKeyDown={handleKeyDown}
           onClick={(e) => {
             // Auto-close only when a MenuItem (role="menuitem") is clicked
@@ -100,11 +109,13 @@ function MenuItem({
   onClick,
   disabled = false,
   shortcut,
+  checked,
 }: {
   label: string;
   onClick: () => void;
   disabled?: boolean;
   shortcut?: string;
+  checked?: boolean;
 }) {
   return (
     <button
@@ -113,7 +124,12 @@ function MenuItem({
       onClick={onClick}
       disabled={disabled}
     >
-      <span>{label}</span>
+      <span className="flex items-center gap-2">
+        {checked !== undefined && (
+          <span className="w-3 text-center text-[10px]">{checked ? "\u2713" : ""}</span>
+        )}
+        {label}
+      </span>
       {shortcut && <span className="text-[10px] text-[var(--text-muted)] font-mono ml-3">{shortcut}</span>}
     </button>
   );
@@ -131,12 +147,33 @@ function MenuLabel({ children }: { children: React.ReactNode }) {
 
 type PreviewBg = "checker" | "black" | "white" | "gray";
 
-export default function TopBar({ onManageImages, previewBg, onSetPreviewBg }: {
+export default function TopBar({
+  onManageImages,
+  previewBg,
+  onSetPreviewBg,
+  onUndo,
+  onRedo,
+  onRotateCW,
+  onRotateCCW,
+  onResetPrediction,
+  onCancelCrop,
+  onToggleShortcuts,
+  onNavigate,
+}: {
   onManageImages?: () => void;
   previewBg?: PreviewBg;
   onSetPreviewBg?: (bg: PreviewBg) => void;
+  onUndo?: () => void;
+  onRedo?: () => void;
+  onRotateCW?: () => void;
+  onRotateCCW?: () => void;
+  onResetPrediction?: () => void;
+  onCancelCrop?: () => void;
+  onToggleShortcuts?: () => void;
+  onNavigate?: (dir: "up" | "down") => void;
 }) {
   const { state, dispatch } = useApp();
+  const draft = useDraft();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [exporting, setExporting] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
@@ -195,7 +232,7 @@ export default function TopBar({ onManageImages, previewBg, onSetPreviewBg }: {
       const kb = Math.round(blob.size / 1024);
       showToast(`JPEG exported (${kb} KB)`);
     }, "image/jpeg", 0.92);
-  }, [state.images, state.selectedImageId]);
+  }, [state.images, state.selectedImageId, showToast]);
 
   const handleExportAll = useCallback(async () => {
     setExporting(true);
@@ -275,9 +312,13 @@ export default function TopBar({ onManageImages, previewBg, onSetPreviewBg }: {
     } finally {
       setExportingPdf(false);
     }
-  }, [state.images, pdfPageSize, customW, customH]);
+  }, [state.images, pdfPageSize, customW, customH, showToast]);
 
-  const multipleImages = state.images.filter((img) => img.editState != null).length > 1;
+  const selectedImage = state.images.find((img) => img.id === state.selectedImageId);
+  const hasEditState = !!selectedImage?.editState;
+  const hasPast = (selectedImage?.history?.past?.length ?? 0) > 0;
+  const hasFuture = (selectedImage?.history?.future?.length ?? 0) > 0;
+  const multipleEditable = state.images.filter((img) => img.editState != null).length > 1;
 
   const handleBatchRotateCW = useCallback(() => {
     dispatch({ type: "BATCH_ROTATE", rotation: 90 });
@@ -302,165 +343,52 @@ export default function TopBar({ onManageImages, previewBg, onSetPreviewBg }: {
     (img) => img.status === "ready" && img.cropCanvas,
   ).length;
 
+  const noImages = state.images.length === 0;
+
   return (
     <div className="h-11 flex items-center justify-between px-3 bg-[var(--bg-secondary)] border-b border-[var(--border)] relative">
-      <div className="flex items-center gap-3">
-        <span className="text-sm font-semibold text-[var(--text-primary)]">
+      {/* Left side: title + menus */}
+      <div className="flex items-center gap-1">
+        <span className="text-sm font-semibold text-[var(--text-primary)] mr-2">
           Document Auto-Crop
         </span>
-        <span className="text-xs text-[var(--text-muted)]">
-          {state.images.length} image
-          {state.images.length !== 1 ? "s" : ""}
-        </span>
-      </div>
 
-      <div className="flex items-center gap-1.5">
-        {/* Mask Overlay Toggle */}
-        <button
-          className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors flex items-center gap-1.5 ${
-            state.showMask
-              ? "bg-[var(--accent-muted)] text-[var(--accent)]"
-              : "bg-[var(--bg-tertiary)] text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
-          }`}
-          onClick={() => dispatch({ type: "TOGGLE_MASK" })}
-          title={state.showMask ? "Hide mask overlay" : "Show mask overlay"}
-        >
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-            <rect x="1" y="2" width="12" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.3" />
-            <path d="M1 8.5h12" stroke="currentColor" strokeWidth="1.3" strokeDasharray="2 1.5" />
-            {!state.showMask && <path d="M2 12L12 2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />}
-          </svg>
-          Mask
-        </button>
-
-        <div className="w-px h-5 bg-[var(--border)]" />
-
-        {/* Preview Background */}
-        {onSetPreviewBg && (
-          <div className="flex items-center gap-1 mr-1">
-            <span className="text-[10px] text-[var(--text-muted)]">BG</span>
-            {([
-              { value: "checker" as PreviewBg, title: "Checkerboard", style: { backgroundImage: "linear-gradient(45deg, #888 25%, transparent 25%), linear-gradient(-45deg, #888 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #888 75%), linear-gradient(-45deg, transparent 75%, #888 75%)", backgroundSize: "6px 6px", backgroundPosition: "0 0, 0 3px, 3px -3px, -3px 0" } },
-              { value: "black" as PreviewBg, title: "Black", style: { backgroundColor: "#000" } },
-              { value: "gray" as PreviewBg, title: "Gray", style: { backgroundColor: "#555" } },
-              { value: "white" as PreviewBg, title: "White", style: { backgroundColor: "#fff" } },
-            ]).map((opt) => (
-              <button
-                key={opt.value}
-                className={`w-5 h-5 rounded border transition-colors ${previewBg === opt.value ? "border-[var(--accent)] ring-1 ring-[var(--accent)]" : "border-[var(--border)] hover:border-[var(--border-hover)]"}`}
-                style={opt.style}
-                onClick={() => onSetPreviewBg(opt.value)}
-                title={opt.title}
-              />
-            ))}
-            <div className="w-px h-5 bg-[var(--border)] ml-1" />
-          </div>
-        )}
-        {/* Add Images */}
-        <button
-          className="px-3 py-1.5 text-xs font-medium rounded-lg bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] transition-colors"
-          onClick={() => fileInputRef.current?.click()}
-        >
-          + Add
-        </button>
-
-        {/* Manage Images */}
-        {onManageImages && (
-          <button
-            className="px-3 py-1.5 text-xs font-medium rounded-lg bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] transition-colors disabled:opacity-40"
-            onClick={onManageImages}
-            disabled={state.images.length === 0}
-          >
-            Manage
-          </button>
-        )}
-
-        {/* Batch Operations Menu */}
-        {multipleImages && (
-          <DropdownMenu label="Batch" minWidth={280}>
-            <MenuLabel>Rotate All</MenuLabel>
-            <MenuItem label="Rotate All 90° CW" onClick={handleBatchRotateCW} />
-            <MenuItem label="Rotate All 90° CCW" onClick={handleBatchRotateCCW} />
-            <MenuDivider />
-            <MenuLabel>Apply Filter to All</MenuLabel>
-            <div className="px-3 py-1.5 flex flex-col gap-2">
-              {/* Filter type toggle */}
-              <div className="flex rounded-md overflow-hidden border border-[var(--border)]">
-                <button
-                  className={`flex-1 px-2 py-1.5 text-[11px] font-medium transition-colors ${
-                    batchFilterType === "none"
-                      ? "bg-[var(--bg-tertiary)] text-[var(--text-primary)]"
-                      : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
-                  }`}
-                  onClick={() => setBatchFilterType("none")}
-                >
-                  Original
-                </button>
-                <button
-                  className={`flex-1 px-2 py-1.5 text-[11px] font-medium transition-colors ${
-                    batchFilterType === "binarize"
-                      ? "bg-[var(--accent-muted)] text-[var(--accent)]"
-                      : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
-                  }`}
-                  onClick={() => setBatchFilterType("binarize")}
-                >
-                  B&W
-                </button>
-              </div>
-              {/* B&W parameters */}
-              {batchFilterType === "binarize" && (
-                <div className="flex flex-col gap-1.5">
-                  <label className="flex flex-col gap-0.5">
-                    <div className="flex justify-between text-[11px]">
-                      <span className="text-[var(--text-muted)]">Block Radius</span>
-                      <span className="font-mono text-[var(--text-secondary)]">{batchBinarize.blockRadiusBps}</span>
-                    </div>
-                    <input type="range" min={20} max={1000} step={10} value={batchBinarize.blockRadiusBps}
-                      className="w-full h-3"
-                      onChange={(e) => setBatchBinarize((prev) => ({ ...prev, blockRadiusBps: Number(e.target.value) }))}
-                    />
-                  </label>
-                  <label className="flex flex-col gap-0.5">
-                    <div className="flex justify-between text-[11px]">
-                      <span className="text-[var(--text-muted)]">Contrast</span>
-                      <span className="font-mono text-[var(--text-secondary)]">{batchBinarize.contrastOffset}</span>
-                    </div>
-                    <input type="range" min={-50} max={10} step={1} value={batchBinarize.contrastOffset}
-                      className="w-full h-3"
-                      onChange={(e) => setBatchBinarize((prev) => ({ ...prev, contrastOffset: Number(e.target.value) }))}
-                    />
-                  </label>
-                  <label className="flex flex-col gap-0.5">
-                    <div className="flex justify-between text-[11px]">
-                      <span className="text-[var(--text-muted)]">Upscale %</span>
-                      <span className="font-mono text-[var(--text-secondary)]">{batchBinarize.upsamplingScale}</span>
-                    </div>
-                    <input type="range" min={100} max={400} step={25} value={batchBinarize.upsamplingScale}
-                      className="w-full h-3"
-                      onChange={(e) => setBatchBinarize((prev) => ({ ...prev, upsamplingScale: Number(e.target.value) }))}
-                    />
-                  </label>
-                </div>
-              )}
-              <button
-                className="w-full px-3 py-1.5 text-xs font-medium rounded-md bg-[var(--accent)] text-[var(--bg-primary)] hover:bg-[var(--accent-hover)] transition-colors"
-                onClick={handleBatchFilter}
-              >
-                Apply to All Images
-              </button>
-            </div>
-          </DropdownMenu>
-        )}
-
-        <div className="w-px h-5 bg-[var(--border)]" />
-
-        {/* Export Menu */}
-        <DropdownMenu label="Export" accent>
+        {/* File Menu */}
+        <DropdownMenu label="File" menuTrigger minWidth={260}>
+          <MenuItem
+            label="Open Draft Folder..."
+            onClick={() => draft.openDraft()}
+            shortcut="\u2318O"
+          />
+          <MenuItem
+            label="Save Draft"
+            onClick={() => draft.save()}
+            disabled={noImages}
+            shortcut="\u2318S"
+          />
+          <MenuItem
+            label="Save Draft As..."
+            onClick={() => draft.saveAs()}
+            disabled={noImages}
+            shortcut="\u21E7\u2318S"
+          />
+          <MenuDivider />
+          <MenuItem
+            label="Add Images..."
+            onClick={() => fileInputRef.current?.click()}
+          />
+          <MenuItem
+            label="Manage Images"
+            onClick={() => onManageImages?.()}
+            disabled={noImages}
+          />
+          <MenuDivider />
+          <MenuLabel>Export</MenuLabel>
           <MenuItem
             label="Download Current as JPEG"
             onClick={handleExport}
             disabled={!state.selectedImageId}
-            shortcut="^S"
+            shortcut="\u2318E"
           />
           <MenuItem
             label={exporting ? "Exporting ZIP..." : `Download All as ZIP (${readyCount})`}
@@ -480,7 +408,7 @@ export default function TopBar({ onManageImages, previewBg, onSetPreviewBg }: {
             >
               {PDF_PAGE_SIZES.map((s) => (
                 <option key={s.label} value={s.label}>
-                  {s.label}{s.widthMm > 0 ? ` (${s.widthMm}×${s.heightMm})` : ""}
+                  {s.label}{s.widthMm > 0 ? ` (${s.widthMm}\u00D7${s.heightMm})` : ""}
                 </option>
               ))}
             </select>
@@ -494,7 +422,7 @@ export default function TopBar({ onManageImages, previewBg, onSetPreviewBg }: {
                   max={1000}
                   onChange={(e) => setCustomW(Number(e.target.value) || 210)}
                 />
-                <span className="text-[10px] text-[var(--text-muted)]">×</span>
+                <span className="text-[10px] text-[var(--text-muted)]">\u00D7</span>
                 <input
                   type="number"
                   className="flex-1 px-1.5 py-1 text-xs rounded-md bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border border-[var(--border)] text-center"
@@ -514,17 +442,221 @@ export default function TopBar({ onManageImages, previewBg, onSetPreviewBg }: {
           />
         </DropdownMenu>
 
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          multiple
-          className="hidden"
-          onChange={(e) =>
-            e.target.files && handleAddImages(e.target.files)
-          }
-        />
+        {/* Edit Menu */}
+        <DropdownMenu label="Edit" menuTrigger minWidth={240}>
+          <MenuItem
+            label="Undo"
+            onClick={() => onUndo?.()}
+            disabled={!hasPast}
+            shortcut="\u2318Z"
+          />
+          <MenuItem
+            label="Redo"
+            onClick={() => onRedo?.()}
+            disabled={!hasFuture}
+            shortcut="\u21E7\u2318Z"
+          />
+          <MenuDivider />
+          <MenuItem
+            label="Rotate 90\u00B0 CW"
+            onClick={() => onRotateCW?.()}
+            disabled={!hasEditState}
+            shortcut="R"
+          />
+          <MenuItem
+            label="Rotate 90\u00B0 CCW"
+            onClick={() => onRotateCCW?.()}
+            disabled={!hasEditState}
+            shortcut="\u21E7R"
+          />
+          <MenuItem
+            label="Reset to Detection"
+            onClick={() => onResetPrediction?.()}
+            disabled={!hasEditState}
+          />
+          <MenuItem
+            label="Cancel Crop"
+            onClick={() => onCancelCrop?.()}
+            disabled={!hasEditState}
+          />
+          {multipleEditable && (
+            <>
+              <MenuDivider />
+              <MenuLabel>Batch</MenuLabel>
+              <MenuItem label="Rotate All CW" onClick={handleBatchRotateCW} />
+              <MenuItem label="Rotate All CCW" onClick={handleBatchRotateCCW} />
+              <MenuDivider />
+              <MenuLabel>Apply Filter to All</MenuLabel>
+              <div className="px-3 py-1.5 flex flex-col gap-2">
+                {/* Filter type toggle */}
+                <div className="flex rounded-md overflow-hidden border border-[var(--border)]">
+                  <button
+                    className={`flex-1 px-2 py-1.5 text-[11px] font-medium transition-colors ${
+                      batchFilterType === "none"
+                        ? "bg-[var(--bg-tertiary)] text-[var(--text-primary)]"
+                        : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+                    }`}
+                    onClick={() => setBatchFilterType("none")}
+                  >
+                    Original
+                  </button>
+                  <button
+                    className={`flex-1 px-2 py-1.5 text-[11px] font-medium transition-colors ${
+                      batchFilterType === "binarize"
+                        ? "bg-[var(--accent-muted)] text-[var(--accent)]"
+                        : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+                    }`}
+                    onClick={() => setBatchFilterType("binarize")}
+                  >
+                    B&W
+                  </button>
+                </div>
+                {/* B&W parameters */}
+                {batchFilterType === "binarize" && (
+                  <div className="flex flex-col gap-1.5">
+                    <label className="flex flex-col gap-0.5">
+                      <div className="flex justify-between text-[11px]">
+                        <span className="text-[var(--text-muted)]">Block Radius</span>
+                        <span className="font-mono text-[var(--text-secondary)]">{batchBinarize.blockRadiusBps}</span>
+                      </div>
+                      <input type="range" min={20} max={1000} step={10} value={batchBinarize.blockRadiusBps}
+                        className="w-full h-3"
+                        onChange={(e) => setBatchBinarize((prev) => ({ ...prev, blockRadiusBps: Number(e.target.value) }))}
+                      />
+                    </label>
+                    <label className="flex flex-col gap-0.5">
+                      <div className="flex justify-between text-[11px]">
+                        <span className="text-[var(--text-muted)]">Contrast</span>
+                        <span className="font-mono text-[var(--text-secondary)]">{batchBinarize.contrastOffset}</span>
+                      </div>
+                      <input type="range" min={-50} max={10} step={1} value={batchBinarize.contrastOffset}
+                        className="w-full h-3"
+                        onChange={(e) => setBatchBinarize((prev) => ({ ...prev, contrastOffset: Number(e.target.value) }))}
+                      />
+                    </label>
+                    <label className="flex flex-col gap-0.5">
+                      <div className="flex justify-between text-[11px]">
+                        <span className="text-[var(--text-muted)]">Upscale %</span>
+                        <span className="font-mono text-[var(--text-secondary)]">{batchBinarize.upsamplingScale}</span>
+                      </div>
+                      <input type="range" min={100} max={400} step={25} value={batchBinarize.upsamplingScale}
+                        className="w-full h-3"
+                        onChange={(e) => setBatchBinarize((prev) => ({ ...prev, upsamplingScale: Number(e.target.value) }))}
+                      />
+                    </label>
+                  </div>
+                )}
+                <button
+                  className="w-full px-3 py-1.5 text-xs font-medium rounded-md bg-[var(--accent)] text-[var(--bg-primary)] hover:bg-[var(--accent-hover)] transition-colors"
+                  onClick={handleBatchFilter}
+                >
+                  Apply to All Images
+                </button>
+              </div>
+            </>
+          )}
+        </DropdownMenu>
+
+        {/* View Menu */}
+        <DropdownMenu label="View" menuTrigger minWidth={220}>
+          <MenuLabel>Preview Background</MenuLabel>
+          {([
+            { value: "checker" as PreviewBg, label: "Checker" },
+            { value: "black" as PreviewBg, label: "Black" },
+            { value: "gray" as PreviewBg, label: "Gray" },
+            { value: "white" as PreviewBg, label: "White" },
+          ]).map((opt) => (
+            <MenuItem
+              key={opt.value}
+              label={opt.label}
+              onClick={() => onSetPreviewBg?.(opt.value)}
+              checked={previewBg === opt.value}
+            />
+          ))}
+          <MenuDivider />
+          <MenuItem
+            label="Show Mask Overlay"
+            onClick={() => dispatch({ type: "TOGGLE_MASK" })}
+            checked={state.showMask}
+          />
+          <MenuDivider />
+          <MenuItem
+            label="Previous Image"
+            onClick={() => onNavigate?.("up")}
+            shortcut="\u2191"
+          />
+          <MenuItem
+            label="Next Image"
+            onClick={() => onNavigate?.("down")}
+            shortcut="\u2193"
+          />
+          <MenuDivider />
+          <MenuItem
+            label="Keyboard Shortcuts"
+            onClick={() => onToggleShortcuts?.()}
+            shortcut="?"
+          />
+        </DropdownMenu>
       </div>
+
+      {/* Right side: draft status + image count + BG swatches */}
+      <div className="flex items-center gap-3">
+        {/* Draft status indicator */}
+        {draft.dirHandle && (
+          <div className="flex items-center gap-1.5 text-[11px] text-[var(--text-muted)]">
+            {draft.isSaving ? (
+              <>
+                <svg className="w-3 h-3 animate-spin" viewBox="0 0 16 16" fill="none">
+                  <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="2" strokeDasharray="28" strokeDashoffset="8" strokeLinecap="round" />
+                </svg>
+                <span>Saving...</span>
+              </>
+            ) : draft.lastSavedAt ? (
+              <span>Saved {new Date(draft.lastSavedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+            ) : null}
+            {draft.hasUnsavedChanges && !draft.isSaving && (
+              <div className="w-1.5 h-1.5 rounded-full bg-[var(--accent)]" title="Unsaved changes" />
+            )}
+          </div>
+        )}
+
+        <span className="text-xs text-[var(--text-muted)]">
+          {state.images.length} image
+          {state.images.length !== 1 ? "s" : ""}
+        </span>
+
+        {/* Preview Background swatches */}
+        {onSetPreviewBg && (
+          <div className="flex items-center gap-1">
+            <span className="text-[10px] text-[var(--text-muted)]">BG</span>
+            {([
+              { value: "checker" as PreviewBg, title: "Checkerboard", style: { backgroundImage: "linear-gradient(45deg, #888 25%, transparent 25%), linear-gradient(-45deg, #888 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #888 75%), linear-gradient(-45deg, transparent 75%, #888 75%)", backgroundSize: "6px 6px", backgroundPosition: "0 0, 0 3px, 3px -3px, -3px 0" } },
+              { value: "black" as PreviewBg, title: "Black", style: { backgroundColor: "#000" } },
+              { value: "gray" as PreviewBg, title: "Gray", style: { backgroundColor: "#555" } },
+              { value: "white" as PreviewBg, title: "White", style: { backgroundColor: "#fff" } },
+            ]).map((opt) => (
+              <button
+                key={opt.value}
+                className={`w-5 h-5 rounded border transition-colors ${previewBg === opt.value ? "border-[var(--accent)] ring-1 ring-[var(--accent)]" : "border-[var(--border)] hover:border-[var(--border-hover)]"}`}
+                style={opt.style}
+                onClick={() => onSetPreviewBg(opt.value)}
+                title={opt.title}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        multiple
+        className="hidden"
+        onChange={(e) =>
+          e.target.files && handleAddImages(e.target.files)
+        }
+      />
 
       {/* Toast notification */}
       {toast && (

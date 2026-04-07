@@ -310,7 +310,39 @@ export default function EditorScreen() {
 
   return (
     <div className="h-dvh flex flex-col">
-      <TopBar onManageImages={() => setSortModalOpen(true)} previewBg={previewBg} onSetPreviewBg={setPreviewBg} />
+      <TopBar
+        onManageImages={() => setSortModalOpen(true)}
+        previewBg={previewBg}
+        onSetPreviewBg={setPreviewBg}
+        onUndo={() => { if (selectedImage) dispatch({ type: "UNDO", id: selectedImage.id }); }}
+        onRedo={() => { if (selectedImage) dispatch({ type: "REDO", id: selectedImage.id }); }}
+        onRotateCW={() => {
+          if (selectedImage?.editState) {
+            dispatch({ type: "PUSH_HISTORY", id: selectedImage.id });
+            dispatch({ type: "SET_EDIT_STATE", id: selectedImage.id, editState: {
+              ...selectedImage.editState,
+              rotation: ((selectedImage.editState.rotation + 90) % 360) as 0 | 90 | 180 | 270,
+            }});
+          }
+        }}
+        onRotateCCW={() => {
+          if (selectedImage?.editState) {
+            dispatch({ type: "PUSH_HISTORY", id: selectedImage.id });
+            dispatch({ type: "SET_EDIT_STATE", id: selectedImage.id, editState: {
+              ...selectedImage.editState,
+              rotation: ((selectedImage.editState.rotation + 270) % 360) as 0 | 90 | 180 | 270,
+            }});
+          }
+        }}
+        onResetPrediction={() => { if (selectedImage) dispatch({ type: "RESET_TO_PREDICTION", id: selectedImage.id }); }}
+        onCancelCrop={() => { if (selectedImage) dispatch({ type: "CANCEL_CROP", id: selectedImage.id }); }}
+        onToggleShortcuts={() => setShortcutsOpen(v => !v)}
+        onNavigate={(dir) => {
+          const idx = state.images.findIndex(img => img.id === state.selectedImageId);
+          const newIdx = dir === "up" ? Math.max(0, idx - 1) : Math.min(state.images.length - 1, idx + 1);
+          if (newIdx !== idx) dispatch({ type: "SELECT_IMAGE", id: state.images[newIdx].id });
+        }}
+      />
       <div className="flex-1 flex min-h-0">
         <div className="flex flex-col flex-shrink-0 relative border-r border-[var(--border)] bg-[var(--bg-secondary)]" style={{ width: sidebarWidth }}>
           <ImageList />
