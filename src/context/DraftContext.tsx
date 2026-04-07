@@ -178,14 +178,18 @@ export function DraftProvider({ children }: { children: ReactNode }) {
     } catch {
       return;
     }
-    const data = await loadDraft(handle);
-    setDirHandle(handle);
-    dirHandleRef.current = handle;
-    savedImageIdsRef.current = new Set(data.images.map(img => img.id));
-    savedCounter.current = changeCounter.current;
-    await idbSet(IDB_HANDLE_KEY, handle);
-    setLastSavedAt(new Date().toISOString());
-    dispatch({ type: "LOAD_DRAFT", images: data.images, showMask: data.showMask });
+    try {
+      const data = await loadDraft(handle);
+      setDirHandle(handle);
+      dirHandleRef.current = handle;
+      savedImageIdsRef.current = new Set(data.images.map(img => img.id));
+      savedCounter.current = changeCounter.current;
+      await idbSet(IDB_HANDLE_KEY, handle);
+      setLastSavedAt(new Date().toISOString());
+      dispatch({ type: "LOAD_DRAFT", images: data.images, showMask: data.showMask });
+    } catch (e) {
+      console.error("Failed to load draft:", e);
+    }
   }, [isSupported, dispatch]);
 
   const openRecentDraft = useCallback(async () => {
@@ -196,13 +200,17 @@ export function DraftProvider({ children }: { children: ReactNode }) {
     const perm = await (handle as FileSystemDirectoryHandle & { requestPermission: (opts: { mode: string }) => Promise<string> }).requestPermission({ mode: "readwrite" });
     if (perm !== "granted") return;
 
-    const data = await loadDraft(handle);
-    setDirHandle(handle);
-    dirHandleRef.current = handle;
-    savedImageIdsRef.current = new Set(data.images.map(img => img.id));
-    savedCounter.current = changeCounter.current;
-    setLastSavedAt(new Date().toISOString());
-    dispatch({ type: "LOAD_DRAFT", images: data.images, showMask: data.showMask });
+    try {
+      const data = await loadDraft(handle);
+      setDirHandle(handle);
+      dirHandleRef.current = handle;
+      savedImageIdsRef.current = new Set(data.images.map(img => img.id));
+      savedCounter.current = changeCounter.current;
+      setLastSavedAt(new Date().toISOString());
+      dispatch({ type: "LOAD_DRAFT", images: data.images, showMask: data.showMask });
+    } catch (e) {
+      console.error("Failed to load recent draft:", e);
+    }
   }, [isSupported, dispatch]);
 
   return (

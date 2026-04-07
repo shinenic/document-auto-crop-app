@@ -358,18 +358,19 @@ export default function TopBar({
           <MenuItem
             label="Open Draft Folder..."
             onClick={() => draft.openDraft()}
+            disabled={!draft.isSupported}
             shortcut="\u2318O"
           />
           <MenuItem
             label="Save Draft"
             onClick={() => draft.save()}
-            disabled={noImages}
+            disabled={noImages || !draft.isSupported}
             shortcut="\u2318S"
           />
           <MenuItem
             label="Save Draft As..."
             onClick={() => draft.saveAs()}
-            disabled={noImages}
+            disabled={noImages || !draft.isSupported}
             shortcut="\u21E7\u2318S"
           />
           <MenuDivider />
