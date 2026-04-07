@@ -11,6 +11,18 @@ import { applyEraseMask } from "../lib/eraser";
 import { PDF_PAGE_SIZES, detectBestPageSize, DEFAULT_BINARIZE_CONFIG } from "../lib/types";
 import type { PdfPageSize, FilterConfig, BinarizeConfig } from "../lib/types";
 
+// --- Helpers ---
+
+function timeAgo(iso: string): string {
+  const seconds = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+  if (seconds < 5) return "just now";
+  if (seconds < 60) return `${seconds}s ago`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  return `${hours}h ago`;
+}
+
 // --- Dropdown Menu Component ---
 
 function DropdownMenu({
@@ -126,7 +138,7 @@ function MenuItem({
     >
       <span className="flex items-center gap-2">
         {checked !== undefined && (
-          <span className="w-3 text-center text-[10px]">{checked ? "\u2713" : ""}</span>
+          <span className="w-3 text-center text-[10px]">{checked ? "✓" : ""}</span>
         )}
         {label}
       </span>
@@ -182,6 +194,14 @@ export default function TopBar({
   const [customH, setCustomH] = useState(297);
   const [toast, setToast] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Tick every 30s to refresh "Xm ago" display
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    if (!draft.lastSavedAt) return;
+    const id = setInterval(() => setTick(t => t + 1), 30000);
+    return () => clearInterval(id);
+  }, [draft.lastSavedAt]);
 
   const showToast = useCallback((msg: string) => {
     if (toastTimer.current) clearTimeout(toastTimer.current);
@@ -359,19 +379,19 @@ export default function TopBar({
             label="Open Draft Folder..."
             onClick={() => draft.openDraft()}
             disabled={!draft.isSupported}
-            shortcut="\u2318O"
+            shortcut="⌘O"
           />
           <MenuItem
             label="Save Draft"
             onClick={() => draft.save()}
             disabled={noImages || !draft.isSupported}
-            shortcut="\u2318S"
+            shortcut="⌘S"
           />
           <MenuItem
             label="Save Draft As..."
             onClick={() => draft.saveAs()}
             disabled={noImages || !draft.isSupported}
-            shortcut="\u21E7\u2318S"
+            shortcut="⇧⌘S"
           />
           <MenuDivider />
           <MenuItem
@@ -389,7 +409,7 @@ export default function TopBar({
             label="Download Current as JPEG"
             onClick={handleExport}
             disabled={!state.selectedImageId}
-            shortcut="\u2318E"
+            shortcut="⌘E"
           />
           <MenuItem
             label={exporting ? "Exporting ZIP..." : `Download All as ZIP (${readyCount})`}
@@ -409,7 +429,7 @@ export default function TopBar({
             >
               {PDF_PAGE_SIZES.map((s) => (
                 <option key={s.label} value={s.label}>
-                  {s.label}{s.widthMm > 0 ? ` (${s.widthMm}\u00D7${s.heightMm})` : ""}
+                  {s.label}{s.widthMm > 0 ? ` (${s.widthMm}×${s.heightMm})` : ""}
                 </option>
               ))}
             </select>
@@ -423,7 +443,7 @@ export default function TopBar({
                   max={1000}
                   onChange={(e) => setCustomW(Number(e.target.value) || 210)}
                 />
-                <span className="text-[10px] text-[var(--text-muted)]">\u00D7</span>
+                <span className="text-[10px] text-[var(--text-muted)]">×</span>
                 <input
                   type="number"
                   className="flex-1 px-1.5 py-1 text-xs rounded-md bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border border-[var(--border)] text-center"
@@ -449,26 +469,26 @@ export default function TopBar({
             label="Undo"
             onClick={() => onUndo?.()}
             disabled={!hasPast}
-            shortcut="\u2318Z"
+            shortcut="⌘Z"
           />
           <MenuItem
             label="Redo"
             onClick={() => onRedo?.()}
             disabled={!hasFuture}
-            shortcut="\u21E7\u2318Z"
+            shortcut="⇧⌘Z"
           />
           <MenuDivider />
           <MenuItem
-            label="Rotate 90\u00B0 CW"
+            label="Rotate 90° CW"
             onClick={() => onRotateCW?.()}
             disabled={!hasEditState}
             shortcut="R"
           />
           <MenuItem
-            label="Rotate 90\u00B0 CCW"
+            label="Rotate 90° CCW"
             onClick={() => onRotateCCW?.()}
             disabled={!hasEditState}
-            shortcut="\u21E7R"
+            shortcut="⇧R"
           />
           <MenuItem
             label="Reset to Detection"
@@ -584,12 +604,12 @@ export default function TopBar({
           <MenuItem
             label="Previous Image"
             onClick={() => onNavigate?.("up")}
-            shortcut="\u2191"
+            shortcut="↑"
           />
           <MenuItem
             label="Next Image"
             onClick={() => onNavigate?.("down")}
-            shortcut="\u2193"
+            shortcut="↓"
           />
           <MenuDivider />
           <MenuItem
@@ -613,7 +633,7 @@ export default function TopBar({
                 <span>Saving...</span>
               </>
             ) : draft.lastSavedAt ? (
-              <span>Saved {new Date(draft.lastSavedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+              <span>Saved {timeAgo(draft.lastSavedAt)}</span>
             ) : null}
             {draft.hasUnsavedChanges && !draft.isSaving && (
               <div className="w-1.5 h-1.5 rounded-full bg-[var(--accent)]" title="Unsaved changes" />
