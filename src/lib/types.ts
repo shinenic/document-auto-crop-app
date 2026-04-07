@@ -97,6 +97,7 @@ export interface AppState {
   selectedImageId: string | null;
   modelLoaded: boolean;
   modelLoading: boolean;
+  showMask: boolean;
 }
 
 // --- Selection ---

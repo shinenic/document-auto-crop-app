@@ -315,6 +315,26 @@ export default function TopBar({ onManageImages, previewBg, onSetPreviewBg }: {
       </div>
 
       <div className="flex items-center gap-1.5">
+        {/* Mask Overlay Toggle */}
+        <button
+          className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors flex items-center gap-1.5 ${
+            state.showMask
+              ? "bg-[var(--accent-muted)] text-[var(--accent)]"
+              : "bg-[var(--bg-tertiary)] text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+          }`}
+          onClick={() => dispatch({ type: "TOGGLE_MASK" })}
+          title={state.showMask ? "Hide mask overlay" : "Show mask overlay"}
+        >
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+            <rect x="1" y="2" width="12" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.3" />
+            <path d="M1 8.5h12" stroke="currentColor" strokeWidth="1.3" strokeDasharray="2 1.5" />
+            {!state.showMask && <path d="M2 12L12 2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />}
+          </svg>
+          Mask
+        </button>
+
+        <div className="w-px h-5 bg-[var(--border)]" />
+
         {/* Preview Background */}
         {onSetPreviewBg && (
           <div className="flex items-center gap-1 mr-1">

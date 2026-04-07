@@ -35,7 +35,8 @@ export type AppAction =
   | { type: "BATCH_ROTATE"; rotation: 0 | 90 | 180 | 270 }
   | { type: "BATCH_SET_FILTER"; filterConfig: FilterConfig }
   | { type: "MODEL_LOADING" }
-  | { type: "MODEL_LOADED" };
+  | { type: "MODEL_LOADED" }
+  | { type: "TOGGLE_MASK" };
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -268,6 +269,9 @@ function reducer(state: AppState, action: AppAction): AppState {
     case "MODEL_LOADED":
       return { ...state, modelLoaded: true, modelLoading: false };
 
+    case "TOGGLE_MASK":
+      return { ...state, showMask: !state.showMask };
+
     default:
       return state;
   }
@@ -281,6 +285,7 @@ const initialState: AppState = {
   selectedImageId: null,
   modelLoaded: false,
   modelLoading: false,
+  showMask: true,
 };
 
 const AppContext = createContext<{

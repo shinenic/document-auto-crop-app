@@ -49,19 +49,24 @@ export default function QuadEditor({ onDragStart, onDragEnd }: Props) {
   } | null>(null);
 
   useEffect(() => {
-    if (!selectedImage?.originalCanvas || !selectedImage.mask) return;
-    const base = renderMaskOverlay(
-      selectedImage.originalCanvas,
-      selectedImage.mask,
-      selectedImage.maskWidth,
-      selectedImage.maskHeight,
-    );
-    setBaseCanvas(base);
+    if (!selectedImage?.originalCanvas) return;
+    if (state.showMask && selectedImage.mask) {
+      const base = renderMaskOverlay(
+        selectedImage.originalCanvas,
+        selectedImage.mask,
+        selectedImage.maskWidth,
+        selectedImage.maskHeight,
+      );
+      setBaseCanvas(base);
+    } else {
+      setBaseCanvas(selectedImage.originalCanvas);
+    }
   }, [
     selectedImage?.originalCanvas,
     selectedImage?.mask,
     selectedImage?.maskWidth,
     selectedImage?.maskHeight,
+    state.showMask,
   ]);
 
   const editState = selectedImage?.editState;
