@@ -138,11 +138,11 @@ function MenuItem({
     >
       <span className="flex items-center gap-2">
         {checked !== undefined && (
-          <span className="w-3 text-center text-[10px]">{checked ? "✓" : ""}</span>
+          <span className="w-4 text-center text-[11px]">{checked ? "✓" : ""}</span>
         )}
         {label}
       </span>
-      {shortcut && <span className="text-[10px] text-[var(--text-muted)] font-mono ml-3">{shortcut}</span>}
+      {shortcut && <span className="text-[11px] text-[var(--text-muted)] ml-3 shrink-0">{shortcut}</span>}
     </button>
   );
 }
