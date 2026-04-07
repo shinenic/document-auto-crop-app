@@ -1,6 +1,7 @@
 "use client";
 
 import { AppProvider, useApp } from "../context/AppContext";
+import { DraftProvider } from "../context/DraftContext";
 import UploadScreen from "../components/UploadScreen";
 import EditorScreen from "../components/EditorScreen";
 
@@ -17,7 +18,9 @@ function AppContent() {
 export default function Home() {
   return (
     <AppProvider>
-      <AppContent />
+      <DraftProvider>
+        <AppContent />
+      </DraftProvider>
     </AppProvider>
   );
 }
