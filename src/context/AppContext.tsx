@@ -36,7 +36,8 @@ export type AppAction =
   | { type: "BATCH_SET_FILTER"; filterConfig: FilterConfig }
   | { type: "MODEL_LOADING" }
   | { type: "MODEL_LOADED" }
-  | { type: "TOGGLE_MASK" };
+  | { type: "TOGGLE_MASK" }
+  | { type: "LOAD_DRAFT"; images: ImageEntry[]; showMask: boolean };
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -271,6 +272,15 @@ function reducer(state: AppState, action: AppAction): AppState {
 
     case "TOGGLE_MASK":
       return { ...state, showMask: !state.showMask };
+
+    case "LOAD_DRAFT":
+      return {
+        ...state,
+        screen: "editor",
+        images: action.images,
+        selectedImageId: action.images[0]?.id ?? null,
+        showMask: action.showMask,
+      };
 
     default:
       return state;

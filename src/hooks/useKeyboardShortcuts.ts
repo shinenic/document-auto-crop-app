@@ -2,12 +2,14 @@
 
 import { useEffect, useRef } from "react";
 import { useApp } from "../context/AppContext";
+import { useDraft } from "../context/DraftContext";
 import { rotateCanvas } from "../lib/crop";
 import { applyEraseMask } from "../lib/eraser";
 import type { AppState } from "../lib/types";
 
 export function useKeyboardShortcuts() {
   const { state, dispatch } = useApp();
+  const draft = useDraft();
   const stateRef = useRef<AppState>(state);
   useEffect(() => { stateRef.current = state; });
 
@@ -83,27 +85,22 @@ export function useKeyboardShortcuts() {
         return;
       }
 
-      // Navigate images: ArrowUp / ArrowDown
-      if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+      // Save Draft: Ctrl+S
+      if (meta && !shift && e.key === "s") {
         e.preventDefault();
-        const idx = s.images.findIndex(
-          (img) => img.id === s.selectedImageId,
-        );
-        const newIdx =
-          e.key === "ArrowUp"
-            ? Math.max(0, idx - 1)
-            : Math.min(s.images.length - 1, idx + 1);
-        if (newIdx !== idx) {
-          dispatch({
-            type: "SELECT_IMAGE",
-            id: s.images[newIdx].id,
-          });
-        }
+        draft.save();
         return;
       }
 
-      // Export: Ctrl+S
-      if (meta && !shift && e.key === "s") {
+      // Save Draft As: Ctrl+Shift+S
+      if (meta && shift && (e.key === "s" || e.key === "S")) {
+        e.preventDefault();
+        draft.saveAs();
+        return;
+      }
+
+      // Export JPEG: Ctrl+E
+      if (meta && !shift && e.key === "e") {
         e.preventDefault();
         if (selectedImage?.cropCanvas) {
           const filterType = selectedImage.editState?.filterConfig?.type ?? "none";
@@ -129,9 +126,36 @@ export function useKeyboardShortcuts() {
         }
         return;
       }
+
+      // Open Draft: Ctrl+O
+      if (meta && !shift && e.key === "o") {
+        e.preventDefault();
+        draft.openDraft();
+        return;
+      }
+
+      // Navigate images: ArrowUp / ArrowDown
+      if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+        e.preventDefault();
+        const idx = s.images.findIndex(
+          (img) => img.id === s.selectedImageId,
+        );
+        const newIdx =
+          e.key === "ArrowUp"
+            ? Math.max(0, idx - 1)
+            : Math.min(s.images.length - 1, idx + 1);
+        if (newIdx !== idx) {
+          dispatch({
+            type: "SELECT_IMAGE",
+            id: s.images[newIdx].id,
+          });
+        }
+        return;
+      }
+
     };
 
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [state.screen, dispatch]);
+  }, [state.screen, dispatch, draft]);
 }

@@ -310,7 +310,39 @@ export default function EditorScreen() {
 
   return (
     <div className="h-dvh flex flex-col">
-      <TopBar onManageImages={() => setSortModalOpen(true)} previewBg={previewBg} onSetPreviewBg={setPreviewBg} />
+      <TopBar
+        onManageImages={() => setSortModalOpen(true)}
+        previewBg={previewBg}
+        onSetPreviewBg={setPreviewBg}
+        onUndo={() => { if (selectedImage) dispatch({ type: "UNDO", id: selectedImage.id }); }}
+        onRedo={() => { if (selectedImage) dispatch({ type: "REDO", id: selectedImage.id }); }}
+        onRotateCW={() => {
+          if (selectedImage?.editState) {
+            dispatch({ type: "PUSH_HISTORY", id: selectedImage.id });
+            dispatch({ type: "SET_EDIT_STATE", id: selectedImage.id, editState: {
+              ...selectedImage.editState,
+              rotation: ((selectedImage.editState.rotation + 90) % 360) as 0 | 90 | 180 | 270,
+            }});
+          }
+        }}
+        onRotateCCW={() => {
+          if (selectedImage?.editState) {
+            dispatch({ type: "PUSH_HISTORY", id: selectedImage.id });
+            dispatch({ type: "SET_EDIT_STATE", id: selectedImage.id, editState: {
+              ...selectedImage.editState,
+              rotation: ((selectedImage.editState.rotation + 270) % 360) as 0 | 90 | 180 | 270,
+            }});
+          }
+        }}
+        onResetPrediction={() => { if (selectedImage) dispatch({ type: "RESET_TO_PREDICTION", id: selectedImage.id }); }}
+        onCancelCrop={() => { if (selectedImage) dispatch({ type: "CANCEL_CROP", id: selectedImage.id }); }}
+        onToggleShortcuts={() => setShortcutsOpen(v => !v)}
+        onNavigate={(dir) => {
+          const idx = state.images.findIndex(img => img.id === state.selectedImageId);
+          const newIdx = dir === "up" ? Math.max(0, idx - 1) : Math.min(state.images.length - 1, idx + 1);
+          if (newIdx !== idx) dispatch({ type: "SELECT_IMAGE", id: state.images[newIdx].id });
+        }}
+      />
       <div className="flex-1 flex min-h-0">
         <div className="flex flex-col flex-shrink-0 relative border-r border-[var(--border)] bg-[var(--bg-secondary)]" style={{ width: sidebarWidth }}>
           <ImageList />
@@ -370,7 +402,8 @@ export default function EditorScreen() {
               <kbd className="text-[10px] text-[var(--text-muted)] font-mono bg-[var(--bg-tertiary)] px-1.5 py-0.5 rounded">?</kbd>
             </div>
             {[
-              { group: "Navigation", keys: [["Arrow Up / Down", "Previous / Next image"], ["Ctrl+S", "Export current JPEG"]] },
+              { group: "File", keys: [["Ctrl+S", "Save Draft"], ["Ctrl+Shift+S", "Save Draft As"], ["Ctrl+O", "Open Draft"], ["Ctrl+E", "Export current JPEG"]] },
+              { group: "Navigation", keys: [["Arrow Up / Down", "Previous / Next image"]] },
               { group: "Editing", keys: [["Ctrl+Z", "Undo"], ["Ctrl+Shift+Z", "Redo"], ["R", "Rotate 90° CW"], ["Shift+R", "Rotate 90° CCW"]] },
               { group: "Eraser", keys: [["E", "Toggle eraser mode"], ["B", "Brush tool"], ["L", "Lasso tool"], ["[ / ]", "Brush size -/+"]] },
             ].map(({ group, keys }) => (

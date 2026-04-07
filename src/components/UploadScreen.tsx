@@ -2,10 +2,12 @@
 
 import { useCallback, useRef, useState } from "react";
 import { useApp } from "../context/AppContext";
+import { useDraft } from "../context/DraftContext";
 import { processImages } from "./imageProcessor";
 
 export default function UploadScreen() {
   const { state, dispatch } = useApp();
+  const draft = useDraft();
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -116,6 +118,45 @@ export default function UploadScreen() {
         <span className="w-px h-3 bg-[var(--border)]" />
         <span>WebP</span>
       </div>
+
+      {/* Draft restore section */}
+      {draft.isSupported && (
+        <div className="mt-6 flex flex-col items-center gap-3" onClick={e => e.stopPropagation()}>
+          <div className="flex items-center gap-3 text-[11px] text-[var(--text-muted)]">
+            <div className="w-8 h-px bg-[var(--border)]" />
+            <span>or</span>
+            <div className="w-8 h-px bg-[var(--border)]" />
+          </div>
+
+          {draft.recentDraftInfo && (
+            <button
+              className="px-4 py-2 text-xs font-medium rounded-lg bg-[var(--bg-secondary)] border border-[var(--border)] text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] hover:border-[var(--border-hover)] transition-colors"
+              onClick={draft.openRecentDraft}
+            >
+              Open Recent Draft
+              {draft.recentDraftInfo.imageCount > 0 && (
+                <span className="text-[var(--text-muted)] ml-2">
+                  {draft.recentDraftInfo.imageCount} images
+                  {draft.recentDraftInfo.savedAt && ` · saved ${new Date(draft.recentDraftInfo.savedAt).toLocaleDateString()}`}
+                </span>
+              )}
+            </button>
+          )}
+
+          <button
+            className="px-4 py-2 text-xs text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors"
+            onClick={draft.openDraft}
+          >
+            Open Draft Folder...
+          </button>
+        </div>
+      )}
+
+      {!draft.isSupported && (
+        <p className="mt-4 text-[10px] text-[var(--text-muted)]">
+          Draft save/restore requires Chrome or Edge
+        </p>
+      )}
 
       {/* Workflow hint */}
       <div className="mt-8 flex items-center gap-6 text-[11px] text-[var(--text-muted)]">
