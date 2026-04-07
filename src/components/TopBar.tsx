@@ -500,83 +500,84 @@ export default function TopBar({
             onClick={() => onCancelCrop?.()}
             disabled={!hasEditState}
           />
-          {multipleEditable && (
-            <>
-              <MenuDivider />
-              <MenuLabel>Batch</MenuLabel>
-              <MenuItem label="Rotate All CW" onClick={handleBatchRotateCW} />
-              <MenuItem label="Rotate All CCW" onClick={handleBatchRotateCCW} />
-              <MenuDivider />
-              <MenuLabel>Apply Filter to All</MenuLabel>
-              <div className="px-3 py-1.5 flex flex-col gap-2">
-                {/* Filter type toggle */}
-                <div className="flex rounded-md overflow-hidden border border-[var(--border)]">
-                  <button
-                    className={`flex-1 px-2 py-1.5 text-[11px] font-medium transition-colors ${
-                      batchFilterType === "none"
-                        ? "bg-[var(--bg-tertiary)] text-[var(--text-primary)]"
-                        : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
-                    }`}
-                    onClick={() => setBatchFilterType("none")}
-                  >
-                    Original
-                  </button>
-                  <button
-                    className={`flex-1 px-2 py-1.5 text-[11px] font-medium transition-colors ${
-                      batchFilterType === "binarize"
-                        ? "bg-[var(--accent-muted)] text-[var(--accent)]"
-                        : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
-                    }`}
-                    onClick={() => setBatchFilterType("binarize")}
-                  >
-                    B&W
-                  </button>
-                </div>
-                {/* B&W parameters */}
-                {batchFilterType === "binarize" && (
-                  <div className="flex flex-col gap-1.5">
-                    <label className="flex flex-col gap-0.5">
-                      <div className="flex justify-between text-[11px]">
-                        <span className="text-[var(--text-muted)]">Block Radius</span>
-                        <span className="font-mono text-[var(--text-secondary)]">{batchBinarize.blockRadiusBps}</span>
-                      </div>
-                      <input type="range" min={20} max={1000} step={10} value={batchBinarize.blockRadiusBps}
-                        className="w-full h-3"
-                        onChange={(e) => setBatchBinarize((prev) => ({ ...prev, blockRadiusBps: Number(e.target.value) }))}
-                      />
-                    </label>
-                    <label className="flex flex-col gap-0.5">
-                      <div className="flex justify-between text-[11px]">
-                        <span className="text-[var(--text-muted)]">Contrast</span>
-                        <span className="font-mono text-[var(--text-secondary)]">{batchBinarize.contrastOffset}</span>
-                      </div>
-                      <input type="range" min={-50} max={10} step={1} value={batchBinarize.contrastOffset}
-                        className="w-full h-3"
-                        onChange={(e) => setBatchBinarize((prev) => ({ ...prev, contrastOffset: Number(e.target.value) }))}
-                      />
-                    </label>
-                    <label className="flex flex-col gap-0.5">
-                      <div className="flex justify-between text-[11px]">
-                        <span className="text-[var(--text-muted)]">Upscale %</span>
-                        <span className="font-mono text-[var(--text-secondary)]">{batchBinarize.upsamplingScale}</span>
-                      </div>
-                      <input type="range" min={100} max={400} step={25} value={batchBinarize.upsamplingScale}
-                        className="w-full h-3"
-                        onChange={(e) => setBatchBinarize((prev) => ({ ...prev, upsamplingScale: Number(e.target.value) }))}
-                      />
-                    </label>
-                  </div>
-                )}
+        </DropdownMenu>
+
+        {/* Batch Menu — only shown when 2+ images have editState */}
+        {multipleEditable && (
+          <DropdownMenu label="Batch" menuTrigger minWidth={280}>
+            <MenuLabel>Rotate All</MenuLabel>
+            <MenuItem label="Rotate All CW" onClick={handleBatchRotateCW} />
+            <MenuItem label="Rotate All CCW" onClick={handleBatchRotateCCW} />
+            <MenuDivider />
+            <MenuLabel>Apply Filter to All</MenuLabel>
+            <div className="px-3 py-1.5 flex flex-col gap-2">
+              {/* Filter type toggle */}
+              <div className="flex rounded-md overflow-hidden border border-[var(--border)]">
                 <button
-                  className="w-full px-3 py-1.5 text-xs font-medium rounded-md bg-[var(--accent)] text-[var(--bg-primary)] hover:bg-[var(--accent-hover)] transition-colors"
-                  onClick={handleBatchFilter}
+                  className={`flex-1 px-2 py-1.5 text-[11px] font-medium transition-colors ${
+                    batchFilterType === "none"
+                      ? "bg-[var(--bg-tertiary)] text-[var(--text-primary)]"
+                      : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+                  }`}
+                  onClick={() => setBatchFilterType("none")}
                 >
-                  Apply to All Images
+                  Original
+                </button>
+                <button
+                  className={`flex-1 px-2 py-1.5 text-[11px] font-medium transition-colors ${
+                    batchFilterType === "binarize"
+                      ? "bg-[var(--accent-muted)] text-[var(--accent)]"
+                      : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+                  }`}
+                  onClick={() => setBatchFilterType("binarize")}
+                >
+                  B&W
                 </button>
               </div>
-            </>
-          )}
-        </DropdownMenu>
+              {/* B&W parameters */}
+              {batchFilterType === "binarize" && (
+                <div className="flex flex-col gap-1.5">
+                  <label className="flex flex-col gap-0.5">
+                    <div className="flex justify-between text-[11px]">
+                      <span className="text-[var(--text-muted)]">Block Radius</span>
+                      <span className="font-mono text-[var(--text-secondary)]">{batchBinarize.blockRadiusBps}</span>
+                    </div>
+                    <input type="range" min={20} max={1000} step={10} value={batchBinarize.blockRadiusBps}
+                      className="w-full h-3"
+                      onChange={(e) => setBatchBinarize((prev) => ({ ...prev, blockRadiusBps: Number(e.target.value) }))}
+                    />
+                  </label>
+                  <label className="flex flex-col gap-0.5">
+                    <div className="flex justify-between text-[11px]">
+                      <span className="text-[var(--text-muted)]">Contrast</span>
+                      <span className="font-mono text-[var(--text-secondary)]">{batchBinarize.contrastOffset}</span>
+                    </div>
+                    <input type="range" min={-50} max={10} step={1} value={batchBinarize.contrastOffset}
+                      className="w-full h-3"
+                      onChange={(e) => setBatchBinarize((prev) => ({ ...prev, contrastOffset: Number(e.target.value) }))}
+                    />
+                  </label>
+                  <label className="flex flex-col gap-0.5">
+                    <div className="flex justify-between text-[11px]">
+                      <span className="text-[var(--text-muted)]">Upscale %</span>
+                      <span className="font-mono text-[var(--text-secondary)]">{batchBinarize.upsamplingScale}</span>
+                    </div>
+                    <input type="range" min={100} max={400} step={25} value={batchBinarize.upsamplingScale}
+                      className="w-full h-3"
+                      onChange={(e) => setBatchBinarize((prev) => ({ ...prev, upsamplingScale: Number(e.target.value) }))}
+                    />
+                  </label>
+                </div>
+              )}
+              <button
+                className="w-full px-3 py-1.5 text-xs font-medium rounded-md bg-[var(--accent)] text-[var(--bg-primary)] hover:bg-[var(--accent-hover)] transition-colors"
+                onClick={handleBatchFilter}
+              >
+                Apply to All Images
+              </button>
+            </div>
+          </DropdownMenu>
+        )}
 
         {/* View Menu */}
         <DropdownMenu label="View" menuTrigger minWidth={220}>
@@ -645,6 +646,21 @@ export default function TopBar({
           {state.images.length} image
           {state.images.length !== 1 ? "s" : ""}
         </span>
+
+        {/* Mask overlay toggle */}
+        <button
+          className={`px-2 py-1 text-[10px] rounded transition-colors ${
+            state.showMask
+              ? "bg-[var(--accent-muted)] text-[var(--accent)]"
+              : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+          }`}
+          onClick={() => dispatch({ type: "TOGGLE_MASK" })}
+          title="Toggle mask overlay"
+        >
+          Mask
+        </button>
+
+        <div className="w-px h-5 bg-[var(--border)]" />
 
         {/* Preview Background swatches */}
         {onSetPreviewBg && (
