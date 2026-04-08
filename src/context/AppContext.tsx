@@ -11,6 +11,7 @@ import type {
   AppState,
   EditState,
   FilterConfig,
+  GuideLine,
   ImageEntry,
   QuadResult,
 } from "../lib/types";
@@ -37,7 +38,9 @@ export type AppAction =
   | { type: "MODEL_LOADING" }
   | { type: "MODEL_LOADED" }
   | { type: "TOGGLE_MASK" }
-  | { type: "LOAD_DRAFT"; images: ImageEntry[]; showMask: boolean };
+  | { type: "TOGGLE_GUIDES" }
+  | { type: "SET_GUIDE_LINES"; id: string; guideLines: GuideLine[] }
+  | { type: "LOAD_DRAFT"; images: ImageEntry[]; showMask: boolean; showGuides: boolean };
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -55,6 +58,7 @@ function cloneEditState(s: EditState): EditState {
       binarize: { ...s.filterConfig.binarize },
     },
     eraseMask: s.eraseMask ? cloneEraseMask(s.eraseMask) : null,
+    guideLines: s.guideLines.map((g) => ({ ...g })),
   };
 }
 
@@ -72,6 +76,7 @@ export function editStateFromQuad(quad: QuadResult): EditState {
       binarize: { ...DEFAULT_FILTER_CONFIG.binarize },
     },
     eraseMask: null,
+    guideLines: [],
   };
 }
 
@@ -273,6 +278,19 @@ function reducer(state: AppState, action: AppAction): AppState {
     case "TOGGLE_MASK":
       return { ...state, showMask: !state.showMask };
 
+    case "TOGGLE_GUIDES":
+      return { ...state, showGuides: !state.showGuides };
+
+    case "SET_GUIDE_LINES": {
+      return {
+        ...state,
+        images: state.images.map((img) => {
+          if (img.id !== action.id || !img.editState) return img;
+          return { ...img, editState: { ...img.editState, guideLines: action.guideLines } };
+        }),
+      };
+    }
+
     case "LOAD_DRAFT":
       return {
         ...state,
@@ -280,6 +298,7 @@ function reducer(state: AppState, action: AppAction): AppState {
         images: action.images,
         selectedImageId: action.images[0]?.id ?? null,
         showMask: action.showMask,
+        showGuides: action.showGuides,
       };
 
     default:
@@ -296,6 +315,7 @@ const initialState: AppState = {
   modelLoaded: false,
   modelLoading: false,
   showMask: true,
+  showGuides: false,
 };
 
 const AppContext = createContext<{

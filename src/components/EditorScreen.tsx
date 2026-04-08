@@ -34,6 +34,7 @@ export default function EditorScreen() {
   const [brushSize, setBrushSize] = useState(50);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [previewBg, setPreviewBg] = useState<"checker" | "black" | "white" | "gray">("checker");
+  const [guidePlacementAxis, setGuidePlacementAxis] = useState<"h" | "v" | null>(null);
 
   // Exit eraser mode when switching images or leaving B&W filter
   const currentFilterType = getSelectedImage(state)?.editState?.filterConfig?.type;
@@ -57,9 +58,27 @@ export default function EditorScreen() {
         return;
       }
       if (e.key === "Escape") {
+        if (guidePlacementAxis) { setGuidePlacementAxis(null); return; }
         if (shortcutsOpen) { setShortcutsOpen(false); return; }
         if (eraserActive) { setEraserActive(false); return; }
         return;
+      }
+      if (e.key.toLowerCase() === "g" && !eraserActive) {
+        e.preventDefault();
+        dispatch({ type: "TOGGLE_GUIDES" });
+        return;
+      }
+      if (state.showGuides && !eraserActive) {
+        if (e.key.toLowerCase() === "h") {
+          e.preventDefault();
+          setGuidePlacementAxis((v) => v === "h" ? null : "h");
+          return;
+        }
+        if (e.key.toLowerCase() === "v") {
+          e.preventDefault();
+          setGuidePlacementAxis((v) => v === "v" ? null : "v");
+          return;
+        }
       }
       if (e.key.toLowerCase() === "e" && isBW) {
         e.preventDefault();
@@ -91,7 +110,7 @@ export default function EditorScreen() {
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [eraserActive, shortcutsOpen]);
+  }, [eraserActive, shortcutsOpen, guidePlacementAxis, dispatch]);
 
   const selectedImage = getSelectedImage(state);
 
@@ -367,16 +386,59 @@ export default function EditorScreen() {
             />
           </div>
           <div className="flex-1 flex flex-col min-w-0">
-            <div className="px-3 py-1.5 border-b border-[var(--border)] bg-[var(--bg-secondary)]">
+            <div className="px-3 py-1.5 border-b border-[var(--border)] bg-[var(--bg-secondary)] flex items-center justify-between">
               <h4 className="text-[11px] uppercase tracking-[0.06em] text-[var(--text-muted)] font-semibold">
                 Preview
               </h4>
+              {state.showGuides && (
+                <div className="flex items-center gap-1.5">
+                  <button
+                    className={`px-1.5 py-0.5 text-[9px] rounded border transition-colors ${
+                      guidePlacementAxis === "h"
+                        ? "bg-[var(--accent-muted)] text-[var(--accent)] border-[var(--accent)]"
+                        : "bg-[var(--bg-tertiary)] text-[var(--text-muted)] hover:text-[var(--text-secondary)] border-[var(--border)]"
+                    }`}
+                    onClick={() => setGuidePlacementAxis(guidePlacementAxis === "h" ? null : "h")}
+                    title="Click to place a horizontal guide line"
+                  >
+                    + Horizontal <kbd className="ml-1 text-[8px] font-mono opacity-50">H</kbd>
+                  </button>
+                  <button
+                    className={`px-1.5 py-0.5 text-[9px] rounded border transition-colors ${
+                      guidePlacementAxis === "v"
+                        ? "bg-[var(--accent-muted)] text-[var(--accent)] border-[var(--accent)]"
+                        : "bg-[var(--bg-tertiary)] text-[var(--text-muted)] hover:text-[var(--text-secondary)] border-[var(--border)]"
+                    }`}
+                    onClick={() => setGuidePlacementAxis(guidePlacementAxis === "v" ? null : "v")}
+                    title="Click to place a vertical guide line"
+                  >
+                    + Vertical <kbd className="ml-1 text-[8px] font-mono opacity-50">V</kbd>
+                  </button>
+                  <span className="text-[9px] font-mono text-[var(--accent)] min-w-[1ch] text-center">
+                    {getSelectedImage(state)?.editState?.guideLines?.length ?? 0}
+                  </span>
+                  <button
+                    className="px-1.5 py-0.5 text-[9px] rounded text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors"
+                    onClick={() => {
+                      const img = getSelectedImage(state);
+                      if (!img?.editState) return;
+                      dispatch({ type: "PUSH_HISTORY", id: img.id });
+                      dispatch({ type: "SET_GUIDE_LINES", id: img.id, guideLines: [] });
+                    }}
+                    title="Clear all guide lines"
+                  >
+                    Clear
+                  </button>
+                </div>
+              )}
             </div>
             <CropPreview
               eraserActive={eraserActive}
               eraserTool={eraserTool}
               brushSize={brushSize}
               previewBg={previewBg}
+              guidePlacementAxis={guidePlacementAxis}
+              onGuidePlaced={() => setGuidePlacementAxis(null)}
             />
           </div>
         </div>
@@ -406,6 +468,7 @@ export default function EditorScreen() {
               { group: "Navigation", keys: [["Arrow Up / Down", "Previous / Next image"]] },
               { group: "Editing", keys: [["Ctrl+Z", "Undo"], ["Ctrl+Shift+Z", "Redo"], ["R", "Rotate 90° CW"], ["Shift+R", "Rotate 90° CCW"]] },
               { group: "Eraser", keys: [["E", "Toggle eraser mode"], ["B", "Brush tool"], ["L", "Lasso tool"], ["[ / ]", "Brush size -/+"]] },
+              { group: "Guides", keys: [["G", "Toggle guide lines"], ["H", "Place horizontal line"], ["V", "Place vertical line"], ["Right-click", "Remove line"]] },
             ].map(({ group, keys }) => (
               <div key={group} className="mb-3 last:mb-0">
                 <h4 className="text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">{group}</h4>

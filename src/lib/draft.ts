@@ -1,4 +1,4 @@
-import type { ImageEntry, EditState, EdgeFit, EraseMask, QuadResult, ImageHistory } from "./types";
+import type { ImageEntry, EditState, EdgeFit, EraseMask, QuadResult, ImageHistory, GuideLine } from "./types";
 
 // --- Manifest Types ---
 
@@ -21,17 +21,20 @@ interface ManifestEditState {
   rotation: 0 | 90 | 180 | 270;
   filterConfig: { type: "none" | "binarize"; binarize: { blockRadiusBps: number; contrastOffset: number; upsamplingScale: number } };
   eraseMaskFile: string | null;
+  guideLines: GuideLine[];
 }
 
 interface Manifest {
   version: number;
   savedAt: string;
   showMask: boolean;
+  showGuides: boolean;
   images: ManifestImage[];
 }
 
 export interface DraftData {
   showMask: boolean;
+  showGuides: boolean;
   images: ImageEntry[];
 }
 
@@ -51,6 +54,7 @@ function editStateToManifest(es: EditState, eraseMaskFile: string | null): Manif
     rotation: es.rotation,
     filterConfig: { type: es.filterConfig.type, binarize: { ...es.filterConfig.binarize } },
     eraseMaskFile,
+    guideLines: es.guideLines.map(g => ({ ...g })),
   };
 }
 
@@ -61,6 +65,7 @@ function manifestToEditState(m: ManifestEditState, eraseMask: EraseMask | null):
     rotation: m.rotation,
     filterConfig: { type: m.filterConfig.type, binarize: { ...m.filterConfig.binarize } },
     eraseMask,
+    guideLines: m.guideLines ?? [],
   };
 }
 
@@ -137,6 +142,7 @@ export async function saveDraft(
   images: ImageEntry[],
   showMask: boolean,
   dirtyIds: Set<string> | null, // null = save all (first save)
+  showGuides: boolean = false,
 ): Promise<void> {
   const manifestImages: ManifestImage[] = [];
   const usedFileNames = new Set<string>();
@@ -196,6 +202,7 @@ export async function saveDraft(
     version: 1,
     savedAt: new Date().toISOString(),
     showMask,
+    showGuides,
     images: manifestImages,
   };
   const manifestBlob = new Blob([JSON.stringify(manifest, null, 2)], { type: "application/json" });
@@ -311,5 +318,9 @@ export async function loadDraft(dirHandle: FileSystemDirectoryHandle): Promise<D
     });
   }
 
-  return { showMask: manifest.showMask, images };
+  return {
+    showMask: manifest.showMask,
+    showGuides: manifest.showGuides ?? false,
+    images,
+  };
 }

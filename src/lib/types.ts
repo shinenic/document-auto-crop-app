@@ -59,11 +59,19 @@ export interface EditState {
   rotation: 0 | 90 | 180 | 270;
   filterConfig: FilterConfig;
   eraseMask: EraseMask | null;
+  guideLines: GuideLine[];
 }
 
 export interface ImageHistory {
   past: EditState[];
   future: EditState[];
+}
+
+// --- Guide Lines ---
+
+export interface GuideLine {
+  pos: number;    // 0-1 percentage
+  axis: "h" | "v"; // horizontal or vertical
 }
 
 // --- Image Entry ---
@@ -98,6 +106,7 @@ export interface AppState {
   modelLoaded: boolean;
   modelLoading: boolean;
   showMask: boolean;
+  showGuides: boolean;
 }
 
 // --- Selection ---

@@ -601,6 +601,12 @@ export default function TopBar({
             onClick={() => dispatch({ type: "TOGGLE_MASK" })}
             checked={state.showMask}
           />
+          <MenuItem
+            label="Show Guide Lines"
+            onClick={() => dispatch({ type: "TOGGLE_GUIDES" })}
+            checked={state.showGuides}
+            shortcut="G"
+          />
           <MenuDivider />
           <MenuItem
             label="Previous Image"
@@ -649,15 +655,30 @@ export default function TopBar({
 
         {/* Mask overlay toggle */}
         <button
-          className={`px-2 py-1 text-[10px] rounded transition-colors ${
+          className={`px-2 py-1 text-[10px] rounded border transition-colors inline-flex items-center gap-1.5 ${
             state.showMask
-              ? "bg-[var(--accent-muted)] text-[var(--accent)]"
-              : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+              ? "bg-[var(--accent-muted)] text-[var(--accent)] border-[var(--accent)]/30"
+              : "text-[var(--text-muted)] hover:text-[var(--text-secondary)] border-[var(--border)]"
           }`}
           onClick={() => dispatch({ type: "TOGGLE_MASK" })}
           title="Toggle mask overlay"
         >
-          Mask
+          <span className={`inline-block w-1.5 h-1.5 rounded-full ${state.showMask ? "bg-[var(--accent)]" : "bg-[var(--text-muted)]/30"}`} />
+          Mask Overlay
+        </button>
+
+        {/* Guide lines toggle */}
+        <button
+          className={`px-2 py-1 text-[10px] rounded border transition-colors inline-flex items-center gap-1.5 ${
+            state.showGuides
+              ? "bg-[var(--accent-muted)] text-[var(--accent)] border-[var(--accent)]/30"
+              : "text-[var(--text-muted)] hover:text-[var(--text-secondary)] border-[var(--border)]"
+          }`}
+          onClick={() => dispatch({ type: "TOGGLE_GUIDES" })}
+          title="Toggle guide lines (G)"
+        >
+          <span className={`inline-block w-1.5 h-1.5 rounded-full ${state.showGuides ? "bg-[var(--accent)]" : "bg-[var(--text-muted)]/30"}`} />
+          Guide Lines
         </button>
 
         <div className="w-px h-5 bg-[var(--border)]" />
