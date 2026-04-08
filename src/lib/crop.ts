@@ -105,10 +105,132 @@ export function subBezier(
   return left;
 }
 
+// ─── Guide line extrapolation ──────────────────────────────────────────────
+
+type Pt = [number, number];
+type BezierPts = [Pt, Pt, Pt, Pt];
+
+/** Find closest v-parameter on a Bezier edge to a given point. */
+function projectToEdge(
+  edgePts: BezierPts, target: Pt, samples = 80,
+): number {
+  let bestV = 0, bestDist = Infinity;
+  for (let i = 0; i <= samples; i++) {
+    const v = i / samples;
+    const pt = evalBezier(edgePts[0], edgePts[1], edgePts[2], edgePts[3], v);
+    const d = Math.hypot(pt[0] - target[0], pt[1] - target[1]);
+    if (d < bestDist) { bestDist = d; bestV = v; }
+  }
+  return Math.max(0.001, Math.min(0.999, bestV));
+}
+
+/**
+ * Build a C1-continuous extension Bezier from edgePt to guidePt,
+ * matching the guide curve's tangent direction at guidePt.
+ * tanDir = direction from guidePt INTO the curve (towards the other cp).
+ */
+function buildExtensionBezier(
+  edgePt: Pt, guidePt: Pt, tanDir: Pt,
+): BezierPts {
+  const dist = Math.hypot(edgePt[0] - guidePt[0], edgePt[1] - guidePt[1]);
+  const tanLen = Math.hypot(tanDir[0], tanDir[1]) || 1;
+  // Extension cp near guidePt: reflect tangent for C1 continuity
+  const k = dist / (3 * tanLen);
+  const extCp2: Pt = [guidePt[0] - tanDir[0] * k, guidePt[1] - tanDir[1] * k];
+  // Extension cp near edgePt: straight-line default
+  const extCp1: Pt = [edgePt[0] + (guidePt[0] - edgePt[0]) / 3, edgePt[1] + (guidePt[1] - edgePt[1]) / 3];
+  return [edgePt, extCp1, extCp2, guidePt];
+}
+
+/**
+ * Create arc-length evaluator for a composite of multiple Bezier segments.
+ * Traverses all segments continuously from u=0 to u=1.
+ */
+function makeCompositeArcLengthEval(
+  segments: BezierPts[],
+): (u: number) => Pt {
+  const tables = segments.map(([a, b, c, d]) => buildArcLengthTable(a, b, c, d));
+  const lengths = tables.map(t => t[t.length - 1]);
+  const totalLength = lengths.reduce((a, b) => a + b, 0);
+  if (totalLength < 1e-10) {
+    return () => segments[0][0];
+  }
+  return (u: number) => {
+    const target = u * totalLength;
+    let accumulated = 0;
+    for (let i = 0; i < segments.length; i++) {
+      if (accumulated + lengths[i] >= target || i === segments.length - 1) {
+        const localU = lengths[i] > 1e-10 ? (target - accumulated) / lengths[i] : 0;
+        const localT = arcLengthToT(tables[i], localU);
+        return evalBezier(segments[i][0], segments[i][1], segments[i][2], segments[i][3], localT);
+      }
+      accumulated += lengths[i];
+    }
+    const last = segments[segments.length - 1];
+    return last[3]; // end of last segment
+  };
+}
+
+/**
+ * Extrapolate a guide line (whose endpoints are freely placed inside the quad)
+ * to the quad's L/R edges. Returns:
+ * - leftV, rightV: v-parameters on the L/R edges
+ * - eval: arc-length evaluator for the full-width composite curve
+ * - leftPt, rightPt: actual intersection points on L/R edges
+ */
+function extrapolateGuide(
+  g: GuideLine,
+  Lraw: BezierPts,
+  Rraw: BezierPts,
+): { leftV: number; rightV: number; eval: (u: number) => Pt; leftPt: Pt; rightPt: Pt } {
+  // Project endpoints onto L/R edges
+  const leftV = projectToEdge(Lraw, g.p0);
+  const rightV = projectToEdge(Rraw, g.p3);
+  const leftPt = evalBezier(Lraw[0], Lraw[1], Lraw[2], Lraw[3], leftV);
+  const rightPt = evalBezier(Rraw[0], Rraw[1], Rraw[2], Rraw[3], rightV);
+
+  // Tangent directions at endpoints (pointing into the curve)
+  const tanLeft: Pt = [g.cp1[0] - g.p0[0], g.cp1[1] - g.p0[1]];
+  const tanRight: Pt = [g.p3[0] - g.cp2[0], g.p3[1] - g.cp2[1]];
+
+  // Build extension Beziers
+  const extLeft = buildExtensionBezier(leftPt, g.p0, tanLeft);
+  const extRight: BezierPts = (() => {
+    const dist = Math.hypot(rightPt[0] - g.p3[0], rightPt[1] - g.p3[1]);
+    const tanLen = Math.hypot(tanRight[0], tanRight[1]) || 1;
+    const k = dist / (3 * tanLen);
+    const cp1: Pt = [g.p3[0] + tanRight[0] * k, g.p3[1] + tanRight[1] * k];
+    const cp2: Pt = [rightPt[0] - (rightPt[0] - g.p3[0]) / 3, rightPt[1] - (rightPt[1] - g.p3[1]) / 3];
+    return [g.p3, cp1, cp2, rightPt];
+  })();
+
+  // Composite: extLeft + main curve + extRight
+  const mainCurve: BezierPts = [g.p0, g.cp1, g.cp2, g.p3];
+  // Skip extensions if endpoint is very close to edge (< 1px)
+  const segments: BezierPts[] = [];
+  if (Math.hypot(leftPt[0] - g.p0[0], leftPt[1] - g.p0[1]) > 0.5) {
+    segments.push(extLeft);
+  }
+  segments.push(mainCurve);
+  if (Math.hypot(rightPt[0] - g.p3[0], rightPt[1] - g.p3[1]) > 0.5) {
+    segments.push(extRight);
+  }
+
+  return {
+    leftV,
+    rightV,
+    eval: makeCompositeArcLengthEval(segments),
+    leftPt,
+    rightPt,
+  };
+}
+
 // ─── Piecewise Coons patch crop ────────────────────────────────────────────
 
 /**
  * Piecewise Coons patch: guide lines split the quad into horizontal strips.
+ * Guide line endpoints may be inside the quad — they are extrapolated to
+ * the L/R edges with C1-continuous extensions.
  * Each strip gets an independent Coons patch, producing a horizontal band.
  * Strips are stacked vertically to form the final output.
  */
@@ -127,15 +249,14 @@ export function perspectiveCropPiecewise(
   const P00 = corners[0], P10 = corners[1], P11 = corners[2], P01 = corners[3];
 
   // L: TL→BL (edge 3, reversed CPs), R: TR→BR (edge 1)
-  const Lraw: [[number, number], [number, number], [number, number], [number, number]] =
-    [P00, edgeFits[3].cp2, edgeFits[3].cp1, P01];
-  const Rraw: [[number, number], [number, number], [number, number], [number, number]] =
-    [P10, edgeFits[1].cp1, edgeFits[1].cp2, P11];
+  const Lraw: BezierPts = [P00, edgeFits[3].cp2, edgeFits[3].cp1, P01];
+  const Rraw: BezierPts = [P10, edgeFits[1].cp1, edgeFits[1].cp2, P11];
 
-  const Lfull = makeArcLengthEval(Lraw[0], Lraw[1], Lraw[2], Lraw[3]);
-  const Rfull = makeArcLengthEval(Rraw[0], Rraw[1], Rraw[2], Rraw[3]);
+  // Extrapolate each guide line to the edges
+  const extrapolated = guideLines.map(g => extrapolateGuide(g, Lraw, Rraw));
 
-  const sorted = [...guideLines].sort((a, b) => (a.leftV + a.rightV) / 2 - (b.leftV + b.rightV) / 2);
+  // Sort by average v position
+  const sorted = [...extrapolated].sort((a, b) => (a.leftV + a.rightV) / 2 - (b.leftV + b.rightV) / 2);
 
   // V-boundaries
   const vBounds: number[] = [0];
@@ -144,9 +265,9 @@ export function perspectiveCropPiecewise(
 
   // Boundary evaluators
   interface BoundaryEval {
-    eval: (u: number) => [number, number];
-    leftPt: [number, number];
-    rightPt: [number, number];
+    eval: (u: number) => Pt;
+    leftPt: Pt;
+    rightPt: Pt;
   }
 
   const boundaryEvals: BoundaryEval[] = [];
@@ -155,12 +276,9 @@ export function perspectiveCropPiecewise(
   const topEval = makeArcLengthEval(P00, edgeFits[0].cp1, edgeFits[0].cp2, P10);
   boundaryEvals.push({ eval: topEval, leftPt: P00, rightPt: P10 });
 
-  // Guide lines
+  // Guide lines (extrapolated to edges)
   for (const g of sorted) {
-    const p0 = Lfull(g.leftV);
-    const p3 = Rfull(g.rightV);
-    const gEval = makeArcLengthEval(p0, g.cp1, g.cp2, p3);
-    boundaryEvals.push({ eval: gEval, leftPt: p0, rightPt: p3 });
+    boundaryEvals.push({ eval: g.eval, leftPt: g.leftPt, rightPt: g.rightPt });
   }
 
   // Bottom edge (reversed)

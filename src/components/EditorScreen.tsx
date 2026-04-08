@@ -8,7 +8,7 @@ import QuadEditor from "./QuadEditor";
 import CropPreview from "./CropPreview";
 import ToolPanel from "./ToolPanel";
 import { useApp } from "../context/AppContext";
-import { perspectiveCrop, perspectiveCropPiecewise, evalBezier } from "../lib/crop";
+import { perspectiveCrop, perspectiveCropPiecewise } from "../lib/crop";
 import { applyBinarize } from "../lib/binarize";
 import type { AppState, GuideLine } from "../lib/types";
 import { useKeyboardShortcuts } from "../hooks/useKeyboardShortcuts";
@@ -37,6 +37,7 @@ export default function EditorScreen() {
   const [guideAddMode, setGuideAddMode] = useState(false);
   const [guideAddStep, setGuideAddStep] = useState<"left" | "right" | null>(null);
   const [pendingLeftV, setPendingLeftV] = useState<number | null>(null);
+  const [pendingP0, setPendingP0] = useState<[number, number] | null>(null);
 
   // Exit eraser mode when switching images or leaving B&W filter
   const currentFilterType = getSelectedImage(state)?.editState?.filterConfig?.type;
@@ -45,6 +46,7 @@ export default function EditorScreen() {
     setGuideAddMode(false);
     setGuideAddStep(null);
     setPendingLeftV(null);
+    setPendingP0(null);
   }, [state.selectedImageId, currentFilterType]);
 
   // Eraser hotkeys: E=toggle, B=brush, L=lasso, [/]=brush size
@@ -63,7 +65,7 @@ export default function EditorScreen() {
         return;
       }
       if (e.key === "Escape") {
-        if (guideAddMode) { setGuideAddMode(false); setGuideAddStep(null); setPendingLeftV(null); return; }
+        if (guideAddMode) { setGuideAddMode(false); setGuideAddStep(null); setPendingLeftV(null); setPendingP0(null); return; }
         if (shortcutsOpen) { setShortcutsOpen(false); return; }
         if (eraserActive) { setEraserActive(false); return; }
         return;
@@ -316,52 +318,34 @@ export default function EditorScreen() {
     const es = img.editState;
 
     if (guideAddStep === null || guideAddStep === "left") {
-      // Find closest v on L edge
-      const lEdge = { p0: es.corners[0], cp1: es.edgeFits[3].cp2, cp2: es.edgeFits[3].cp1, p3: es.corners[3] };
-      let bestV = 0.5, bestDist = Infinity;
-      for (let step = 0; step < 50; step++) {
-        const v = step / 49;
-        const pt = evalBezier(lEdge.p0, lEdge.cp1, lEdge.cp2, lEdge.p3, v);
-        const d = Math.hypot(pt[0] - mx, pt[1] - my);
-        if (d < bestDist) { bestDist = d; bestV = v; }
-      }
-      setPendingLeftV(Math.max(0.01, Math.min(0.99, bestV)));
+      // First click: place left endpoint (p0) at clicked position
+      setPendingLeftV(mx); // reuse state for storing p0.x temporarily
+      setPendingP0([mx, my]);
       setGuideAddStep("right");
-    } else if (guideAddStep === "right" && pendingLeftV !== null) {
-      // Find closest v on R edge
-      const rEdge = { p0: es.corners[1], cp1: es.edgeFits[1].cp1, cp2: es.edgeFits[1].cp2, p3: es.corners[2] };
-      let bestV = 0.5, bestDist = Infinity;
-      for (let step = 0; step < 50; step++) {
-        const v = step / 49;
-        const pt = evalBezier(rEdge.p0, rEdge.cp1, rEdge.cp2, rEdge.p3, v);
-        const d = Math.hypot(pt[0] - mx, pt[1] - my);
-        if (d < bestDist) { bestDist = d; bestV = v; }
-      }
-      const rightV = Math.max(0.01, Math.min(0.99, bestV));
-
-      // Create the guide line
-      const lEdge2 = { p0: es.corners[0], cp1: es.edgeFits[3].cp2, cp2: es.edgeFits[3].cp1, p3: es.corners[3] };
-      const p0 = evalBezier(lEdge2.p0, lEdge2.cp1, lEdge2.cp2, lEdge2.p3, pendingLeftV);
-      const p3 = evalBezier(rEdge.p0, rEdge.cp1, rEdge.cp2, rEdge.p3, rightV);
+    } else if (guideAddStep === "right" && pendingP0) {
+      // Second click: place right endpoint (p3) and create guide line
+      const p0 = pendingP0;
+      const p3: [number, number] = [mx, my];
 
       const newGuide: GuideLine = {
-        leftV: pendingLeftV,
-        rightV,
+        p0,
+        p3,
         cp1: [p0[0] + (p3[0] - p0[0]) / 3, p0[1] + (p3[1] - p0[1]) / 3],
         cp2: [p0[0] + 2 * (p3[0] - p0[0]) / 3, p0[1] + 2 * (p3[1] - p0[1]) / 3],
       };
 
       dispatch({ type: "PUSH_HISTORY", id: img.id });
       const guideLines = [...es.guideLines, newGuide].sort(
-        (a, b) => (a.leftV + a.rightV) / 2 - (b.leftV + b.rightV) / 2,
+        (a, b) => (a.p0[1] + a.p3[1]) / 2 - (b.p0[1] + b.p3[1]) / 2,
       );
       dispatch({ type: "SET_EDIT_STATE", id: img.id, editState: { ...es, guideLines } });
 
       setGuideAddStep(null);
+      setPendingP0(null);
       setPendingLeftV(null);
       setGuideAddMode(false);
     }
-  }, [guideAddStep, pendingLeftV, dispatch]);
+  }, [guideAddStep, pendingP0, dispatch]);
 
   const handleClearGuides = useCallback(() => {
     const img = getSelectedImage(stateRef.current);
@@ -482,7 +466,7 @@ export default function EditorScreen() {
           onToggleGuideAdd={() => {
             setGuideAddMode((v) => !v);
             if (!guideAddMode) setGuideAddStep("left");
-            else { setGuideAddStep(null); setPendingLeftV(null); }
+            else { setGuideAddStep(null); setPendingLeftV(null); setPendingP0(null); }
           }}
           onClearGuides={handleClearGuides}
         />

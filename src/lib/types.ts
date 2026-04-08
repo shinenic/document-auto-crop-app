@@ -53,10 +53,11 @@ export interface EraseMask {
 
 // --- Guide Lines ---
 
-/** A user-drawn guide line: cubic Bézier from quad L edge to R edge. */
+/** A user-drawn guide line: cubic Bézier with endpoints freely placed inside the quad.
+ *  The system extrapolates to quad L/R edges for piecewise Coons patch boundaries. */
 export interface GuideLine {
-  leftV: number;           // parameter on quad L edge (0=TL, 1=BL)
-  rightV: number;          // parameter on quad R edge (0=TR, 1=BR)
+  p0: [number, number];    // left endpoint (mask space, NOT necessarily on quad edge)
+  p3: [number, number];    // right endpoint (mask space, NOT necessarily on quad edge)
   cp1: [number, number];   // Bezier control point 1 (mask space)
   cp2: [number, number];   // Bezier control point 2 (mask space)
 }

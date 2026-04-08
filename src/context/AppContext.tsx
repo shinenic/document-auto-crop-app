@@ -53,8 +53,8 @@ function cloneEditState(s: EditState): EditState {
       isArc: f.isArc,
     })),
     guideLines: s.guideLines.map((g) => ({
-      leftV: g.leftV,
-      rightV: g.rightV,
+      p0: [...g.p0] as [number, number],
+      p3: [...g.p3] as [number, number],
       cp1: [...g.cp1] as [number, number],
       cp2: [...g.cp2] as [number, number],
     })),
