@@ -16,15 +16,11 @@ export default function CropPreview({
   eraserTool = "brush",
   brushSize = 20,
   previewBg = "checker",
-  guidePlacementAxis = null,
-  onGuidePlaced,
 }: {
   eraserActive?: boolean;
   eraserTool?: "brush" | "lasso";
   brushSize?: number;
   previewBg?: "checker" | "black" | "white" | "gray";
-  guidePlacementAxis?: "h" | "v" | null;
-  onGuidePlaced?: () => void;
 } = {}) {
   const { state, dispatch } = useApp();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -584,7 +580,7 @@ export default function CropPreview({
         } : {
           backgroundColor: previewBg === "black" ? "#000" : previewBg === "white" ? "#fff" : "#555",
         }),
-        cursor: eraserActive ? brushCursor : guidePlacementAxis ? "crosshair" : undefined,
+        cursor: eraserActive ? brushCursor : undefined,
         touchAction: eraserActive ? "none" : undefined,
       }}
       onPointerMove={(e) => {

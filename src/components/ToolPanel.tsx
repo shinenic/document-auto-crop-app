@@ -51,6 +51,15 @@ function IconChevron({ open }: { open: boolean }) {
 }
 function IconCurve() { return <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true"><path d="M3 20Q12 4 21 20" /></svg>; }
 function IconLine() { return <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true"><line x1="3" y1="20" x2="21" y2="4" /></svg>; }
+function IconGuide() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+      <path d="M3 12Q12 6 21 12" />
+      <circle cx="3" cy="12" r="1.5" fill="currentColor" />
+      <circle cx="21" cy="12" r="1.5" fill="currentColor" />
+    </svg>
+  );
+}
 
 // --- Primitives ---
 
@@ -141,10 +150,13 @@ function TogglePill({ options, value, onChange, disabled = false }: {
 
 export default function ToolPanel({
   eraserActive, onToggleEraser, eraserTool, onSetEraserTool, brushSize, onSetBrushSize,
+  guideAddMode, onToggleGuideAdd, onClearGuides,
 }: {
   eraserActive: boolean; onToggleEraser: () => void;
   eraserTool: "brush" | "lasso"; onSetEraserTool: (tool: "brush" | "lasso") => void;
   brushSize: number; onSetBrushSize: (size: number) => void;
+  guideAddMode: boolean; onToggleGuideAdd: () => void;
+  onClearGuides: () => void;
 }) {
   const { state, dispatch } = useApp();
   const sel = state.images.find((img) => img.id === state.selectedImageId);
@@ -320,6 +332,36 @@ export default function ToolPanel({
               {sel?.editState?.eraseMask && (
                 <Btn icon={<IconTrash />} label="Clear All" onClick={clearEraser} danger />
               )}
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Guide Lines */}
+      <div className="h-px bg-[var(--border)]" />
+      <div>
+        <SectionHeader title="Guide Lines" />
+        <div className="flex flex-col gap-1">
+          <Btn
+            icon={<IconGuide />}
+            label={guideAddMode ? "Click L then R edge" : "+ Add Guide"}
+            onClick={onToggleGuideAdd}
+            disabled={!hasCrop}
+            active={guideAddMode}
+          />
+          {(sel?.editState?.guideLines?.length ?? 0) > 0 && (
+            <>
+              <div className="flex items-center justify-between px-1">
+                <span className="text-[10px] text-[var(--text-muted)]">
+                  {sel?.editState?.guideLines?.length ?? 0} guide line{(sel?.editState?.guideLines?.length ?? 0) !== 1 ? "s" : ""}
+                </span>
+                <button
+                  className="text-[10px] text-[var(--text-muted)] hover:text-[var(--danger)] transition-colors"
+                  onClick={onClearGuides}
+                >
+                  Clear
+                </button>
+              </div>
             </>
           )}
         </div>

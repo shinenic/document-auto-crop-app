@@ -32,9 +32,13 @@ const GUIDE_EP_FILL_SEL = "rgba(245, 158, 11, 0.8)";
 interface Props {
   onDragStart: () => void;
   onDragEnd: () => void;
+  guideAddMode: boolean;
+  guideAddStep: "left" | "right" | null;
+  pendingLeftV: number | null;
+  onGuideAddClick: (mx: number, my: number) => void;
 }
 
-export default function QuadEditor({ onDragStart, onDragEnd }: Props) {
+export default function QuadEditor({ onDragStart, onDragEnd, guideAddMode, guideAddStep, pendingLeftV, onGuideAddClick }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const loupeRef = useRef<HTMLCanvasElement>(null);
   const { state, dispatch } = useApp();
@@ -411,9 +415,15 @@ export default function QuadEditor({ onDragStart, onDragEnd }: Props) {
   const handlePointerDown = useCallback(
     (e: React.PointerEvent) => {
       if (!editState || !selectedImage) return;
+      const [mx, my] = toMaskFromPointer(e);
+
+      if (guideAddMode) {
+        onGuideAddClick(mx, my);
+        return;
+      }
+
       const canvas = canvasRef.current;
       if (canvas) canvas.setPointerCapture(e.pointerId);
-      const [mx, my] = toMaskFromPointer(e);
       const pts = getAllPoints();
       let bestDist = Infinity;
       let bestPt: (typeof pts)[0] | null = null;
@@ -452,7 +462,7 @@ export default function QuadEditor({ onDragStart, onDragEnd }: Props) {
         setSelected(null);
       }
     },
-    [editState, selectedImage, toMaskFromPointer, getAllPoints, getScale, imgW, maskWidth, maskHeight, maskToCanvas],
+    [editState, selectedImage, toMaskFromPointer, getAllPoints, getScale, imgW, maskWidth, maskHeight, maskToCanvas, guideAddMode, onGuideAddClick],
   );
 
   // Clamp helpers: corners stay within image, CPs stay within container (padding area)
@@ -642,11 +652,13 @@ export default function QuadEditor({ onDragStart, onDragEnd }: Props) {
         aria-label="Document boundary editor — drag corners and control points to adjust crop"
         className="max-w-full max-h-full"
         style={{
-          cursor: dragging
-            ? selected?.type === "edge"
-              ? (selected.edgeIdx === 0 || selected.edgeIdx === 2 ? "ns-resize" : "ew-resize")
-              : "grabbing"
-            : "pointer",
+          cursor: guideAddMode
+            ? "crosshair"
+            : dragging
+              ? selected?.type === "edge"
+                ? (selected.edgeIdx === 0 || selected.edgeIdx === 2 ? "ns-resize" : "ew-resize")
+                : "grabbing"
+              : "pointer",
           aspectRatio: `${canW} / ${canH}`, touchAction: "none",
         }}
         onPointerDown={handlePointerDown}
