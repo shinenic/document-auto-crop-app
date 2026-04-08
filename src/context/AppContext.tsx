@@ -14,6 +14,7 @@ import type {
   GuideLine,
   ImageEntry,
   QuadResult,
+  ReferenceLine,
 } from "../lib/types";
 import { DEFAULT_FILTER_CONFIG } from "../lib/types";
 import { cloneEraseMask } from "../lib/eraser";
@@ -40,7 +41,8 @@ export type AppAction =
   | { type: "TOGGLE_MASK" }
   | { type: "TOGGLE_GUIDES" }
   | { type: "SET_GUIDE_LINES"; id: string; guideLines: GuideLine[] }
-  | { type: "LOAD_DRAFT"; images: ImageEntry[]; showMask: boolean; showGuides: boolean };
+  | { type: "SET_REF_LINES"; lines: ReferenceLine[] }
+  | { type: "LOAD_DRAFT"; images: ImageEntry[]; showMask: boolean; showGuides: boolean; refLines?: ReferenceLine[] };
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -296,6 +298,9 @@ function reducer(state: AppState, action: AppAction): AppState {
       };
     }
 
+    case "SET_REF_LINES":
+      return { ...state, refLines: action.lines };
+
     case "LOAD_DRAFT":
       return {
         ...state,
@@ -304,6 +309,7 @@ function reducer(state: AppState, action: AppAction): AppState {
         selectedImageId: action.images[0]?.id ?? null,
         showMask: action.showMask,
         showGuides: action.showGuides,
+        refLines: action.refLines ?? [],
       };
 
     default:
@@ -321,6 +327,7 @@ const initialState: AppState = {
   modelLoading: false,
   showMask: true,
   showGuides: false,
+  refLines: [],
 };
 
 const AppContext = createContext<{

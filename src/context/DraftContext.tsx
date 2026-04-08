@@ -111,7 +111,7 @@ export function DraftProvider({ children }: { children: ReactNode }) {
         ? null
         : new Set(s.images.filter(img => !savedImageIdsRef.current.has(img.id)).map(img => img.id));
 
-      await saveDraft(handle, s.images, s.showMask, dirtyIds, s.showGuides);
+      await saveDraft(handle, s.images, s.showMask, dirtyIds, s.showGuides, s.refLines);
 
       savedCounter.current = changeCounter.current;
       savedImageIdsRef.current = new Set(s.images.map(img => img.id));
@@ -142,7 +142,7 @@ export function DraftProvider({ children }: { children: ReactNode }) {
     return () => {
       if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
     };
-  }, [state.images, state.showMask, state.showGuides, state.screen, doSave]);
+  }, [state.images, state.showMask, state.showGuides, state.refLines, state.screen, doSave]);
 
   const save = useCallback(async () => {
     if (!isSupported) return;
@@ -191,7 +191,7 @@ export function DraftProvider({ children }: { children: ReactNode }) {
       savedCounter.current = changeCounter.current;
       await idbSet(IDB_HANDLE_KEY, handle);
       setLastSavedAt(new Date().toISOString());
-      dispatch({ type: "LOAD_DRAFT", images: data.images, showMask: data.showMask, showGuides: data.showGuides });
+      dispatch({ type: "LOAD_DRAFT", images: data.images, showMask: data.showMask, showGuides: data.showGuides, refLines: data.refLines });
     } catch (e) {
       console.error("Failed to load draft:", e);
     }
@@ -212,7 +212,7 @@ export function DraftProvider({ children }: { children: ReactNode }) {
       savedImageIdsRef.current = new Set(data.images.map(img => img.id));
       savedCounter.current = changeCounter.current;
       setLastSavedAt(new Date().toISOString());
-      dispatch({ type: "LOAD_DRAFT", images: data.images, showMask: data.showMask, showGuides: data.showGuides });
+      dispatch({ type: "LOAD_DRAFT", images: data.images, showMask: data.showMask, showGuides: data.showGuides, refLines: data.refLines });
     } catch (e) {
       console.error("Failed to load recent draft:", e);
     }

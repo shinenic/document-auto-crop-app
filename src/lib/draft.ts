@@ -29,12 +29,14 @@ interface Manifest {
   savedAt: string;
   showMask: boolean;
   showGuides: boolean;
+  refLines?: { pos: number; axis: "h" | "v" }[];
   images: ManifestImage[];
 }
 
 export interface DraftData {
   showMask: boolean;
   showGuides: boolean;
+  refLines: { pos: number; axis: "h" | "v" }[];
   images: ImageEntry[];
 }
 
@@ -143,6 +145,7 @@ export async function saveDraft(
   showMask: boolean,
   dirtyIds: Set<string> | null, // null = save all (first save)
   showGuides: boolean = false,
+  refLines: { pos: number; axis: "h" | "v" }[] = [],
 ): Promise<void> {
   const manifestImages: ManifestImage[] = [];
   const usedFileNames = new Set<string>();
@@ -203,6 +206,7 @@ export async function saveDraft(
     savedAt: new Date().toISOString(),
     showMask,
     showGuides,
+    refLines,
     images: manifestImages,
   };
   const manifestBlob = new Blob([JSON.stringify(manifest, null, 2)], { type: "application/json" });
@@ -321,6 +325,7 @@ export async function loadDraft(dirHandle: FileSystemDirectoryHandle): Promise<D
   return {
     showMask: manifest.showMask,
     showGuides: manifest.showGuides ?? false,
+    refLines: manifest.refLines ?? [],
     images,
   };
 }

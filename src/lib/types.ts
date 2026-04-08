@@ -62,6 +62,12 @@ export interface GuideLine {
   cp2: [number, number];   // Bezier control point 2 (mask space)
 }
 
+/** A simple reference line for visual alignment (does NOT affect crop). */
+export interface ReferenceLine {
+  pos: number;        // position as percentage (0-1) along the relevant axis
+  axis: "h" | "v";   // horizontal or vertical
+}
+
 // --- Editor State ---
 
 export interface EditState {
@@ -111,6 +117,7 @@ export interface AppState {
   modelLoading: boolean;
   showMask: boolean;
   showGuides: boolean;
+  refLines: ReferenceLine[];
 }
 
 // --- Selection ---

@@ -38,6 +38,7 @@ export default function EditorScreen() {
   const [guideAddStep, setGuideAddStep] = useState<"left" | "right" | null>(null);
   const [pendingLeftV, setPendingLeftV] = useState<number | null>(null);
   const [pendingP0, setPendingP0] = useState<[number, number] | null>(null);
+  const [guidePlacementAxis, setGuidePlacementAxis] = useState<"h" | "v" | null>(null);
 
   // Exit eraser mode when switching images or leaving B&W filter
   const currentFilterType = getSelectedImage(state)?.editState?.filterConfig?.type;
@@ -442,16 +443,51 @@ export default function EditorScreen() {
             />
           </div>
           <div className="flex-1 flex flex-col min-w-0">
-            <div className="px-3 py-1.5 border-b border-[var(--border)] bg-[var(--bg-secondary)]">
+            <div className="px-3 py-1.5 border-b border-[var(--border)] bg-[var(--bg-secondary)] flex items-center justify-between">
               <h4 className="text-[11px] uppercase tracking-[0.06em] text-[var(--text-muted)] font-semibold">
                 Preview
               </h4>
+              {state.showGuides && (
+                <div className="flex items-center gap-1.5">
+                  <button
+                    className={`px-1.5 py-0.5 text-[9px] rounded border transition-colors ${
+                      guidePlacementAxis === "h"
+                        ? "bg-[var(--accent-muted)] text-[var(--accent)] border-[var(--accent)]"
+                        : "bg-[var(--bg-tertiary)] text-[var(--text-muted)] hover:text-[var(--text-secondary)] border-[var(--border)]"
+                    }`}
+                    onClick={() => setGuidePlacementAxis(guidePlacementAxis === "h" ? null : "h")}
+                  >
+                    + H
+                  </button>
+                  <button
+                    className={`px-1.5 py-0.5 text-[9px] rounded border transition-colors ${
+                      guidePlacementAxis === "v"
+                        ? "bg-[var(--accent-muted)] text-[var(--accent)] border-[var(--accent)]"
+                        : "bg-[var(--bg-tertiary)] text-[var(--text-muted)] hover:text-[var(--text-secondary)] border-[var(--border)]"
+                    }`}
+                    onClick={() => setGuidePlacementAxis(guidePlacementAxis === "v" ? null : "v")}
+                  >
+                    + V
+                  </button>
+                  <span className="text-[9px] font-mono text-[var(--accent)]">
+                    {state.refLines.length}
+                  </span>
+                  <button
+                    className="px-1.5 py-0.5 text-[9px] rounded text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors"
+                    onClick={() => dispatch({ type: "SET_REF_LINES", lines: [] })}
+                  >
+                    Clear
+                  </button>
+                </div>
+              )}
             </div>
             <CropPreview
               eraserActive={eraserActive}
               eraserTool={eraserTool}
               brushSize={brushSize}
               previewBg={previewBg}
+              guidePlacementAxis={guidePlacementAxis}
+              onGuidePlaced={() => setGuidePlacementAxis(null)}
             />
           </div>
         </div>

@@ -15,11 +15,15 @@ export default function CropPreview({
   eraserTool = "brush",
   brushSize = 20,
   previewBg = "checker",
+  guidePlacementAxis,
+  onGuidePlaced,
 }: {
   eraserActive?: boolean;
   eraserTool?: "brush" | "lasso";
   brushSize?: number;
   previewBg?: "checker" | "black" | "white" | "gray";
+  guidePlacementAxis?: "h" | "v" | null;
+  onGuidePlaced?: () => void;
 } = {}) {
   const { state, dispatch } = useApp();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -270,6 +274,33 @@ export default function CropPreview({
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     drawProgressive(ctx, rotated, canvas.width, canvas.height);
+
+    // Draw reference guide lines
+    if (state.showGuides) {
+      const lines = state.refLines;
+      if (lines.length > 0) {
+        ctx.save();
+        const dpr = window.devicePixelRatio || 1;
+        ctx.lineWidth = 1 * dpr;
+        ctx.strokeStyle = "rgba(92, 224, 194, 0.5)";
+        ctx.shadowColor = "rgba(92, 224, 194, 0.3)";
+        ctx.shadowBlur = 3 * dpr;
+        for (const line of lines) {
+          ctx.beginPath();
+          if (line.axis === "h") {
+            const y = Math.round(line.pos * canvas.height);
+            ctx.moveTo(0, y);
+            ctx.lineTo(canvas.width, y);
+          } else {
+            const x = Math.round(line.pos * canvas.width);
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x, canvas.height);
+          }
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+    }
   }, [
     selectedImage?.cropCanvas,
     selectedImage?.filteredCanvas,
@@ -277,6 +308,8 @@ export default function CropPreview({
     selectedImage?.editState?.filterConfig?.type,
     selectedImage?.editState?.eraseMask,
     selectedImage?.originalCanvas,
+    state.showGuides,
+    state.refLines,
   ]);
 
   useEffect(() => {
@@ -456,14 +489,34 @@ export default function CropPreview({
     }
   }, [selectedImage?.cropCanvas, selectedImage?.editState?.rotation, selectedImage?.filteredCanvas]);
 
+  // Guide placement click handler
+  const handleGuidePlacementDown = useCallback(
+    (e: React.PointerEvent) => {
+      if (!guidePlacementAxis || eraserActive) return false;
+      const canvas = canvasRef.current;
+      if (!canvas) return false;
+      const rect = canvas.getBoundingClientRect();
+      const pos = guidePlacementAxis === "h"
+        ? (e.clientY - rect.top) / rect.height
+        : (e.clientX - rect.left) / rect.width;
+      if (pos >= 0 && pos <= 1) {
+        dispatch({ type: "SET_REF_LINES", lines: [...state.refLines, { pos, axis: guidePlacementAxis }] });
+        onGuidePlaced?.();
+      }
+      return true;
+    },
+    [guidePlacementAxis, eraserActive, state.refLines, dispatch, onGuidePlaced],
+  );
+
   const brushCursor = useMemo(() => {
+    if (guidePlacementAxis && !eraserActive) return "crosshair";
     if (!eraserActive || eraserTool !== "brush") return "crosshair";
     const r = Math.max(2, Math.round(brushSize * cursorScale));
     const size = r * 2 + 2;
     const half = size / 2;
     const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='${size}' height='${size}'><circle cx='${half}' cy='${half}' r='${r}' fill='none' stroke='white' stroke-width='1.5'/><circle cx='${half}' cy='${half}' r='${r}' fill='none' stroke='black' stroke-width='0.5'/></svg>`;
     return `url("data:image/svg+xml,${encodeURIComponent(svg)}") ${half} ${half}, crosshair`;
-  }, [eraserActive, eraserTool, brushSize, cursorScale]);
+  }, [eraserActive, eraserTool, brushSize, cursorScale, guidePlacementAxis]);
 
   if (!selectedImage || selectedImage.status !== "ready") {
     return (
@@ -490,11 +543,14 @@ export default function CropPreview({
         } : {
           backgroundColor: previewBg === "black" ? "#000" : previewBg === "white" ? "#fff" : "#555",
         }),
-        cursor: eraserActive ? brushCursor : undefined,
+        cursor: guidePlacementAxis ? "crosshair" : eraserActive ? brushCursor : undefined,
         touchAction: eraserActive ? "none" : undefined,
       }}
       onPointerMove={handlePointerMove}
-      onPointerDown={eraserActive ? handleEraserPointerDown : undefined}
+      onPointerDown={(e) => {
+        if (handleGuidePlacementDown(e)) return;
+        if (eraserActive) handleEraserPointerDown(e);
+      }}
       onPointerUp={eraserActive ? () => handleEraserPointerUp() : undefined}
       onPointerLeave={handlePointerLeave}
     >
