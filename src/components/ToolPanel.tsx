@@ -337,14 +337,14 @@ export default function ToolPanel({
         </div>
       </div>
 
-      {/* Guide Lines */}
+      {/* Dewarp Guides */}
       <div className="h-px bg-[var(--border)]" />
       <div>
-        <SectionHeader title="Guide Lines" />
+        <SectionHeader title="Dewarp Guides" />
         <div className="flex flex-col gap-1">
           <Btn
             icon={<IconGuide />}
-            label={guideAddMode ? "Click L then R edge" : "+ Add Guide"}
+            label={guideAddMode ? "Click two points" : "+ Add Dewarp"}
             onClick={onToggleGuideAdd}
             disabled={!hasCrop}
             active={guideAddMode}
@@ -353,7 +353,7 @@ export default function ToolPanel({
             <>
               <div className="flex items-center justify-between px-1">
                 <span className="text-[10px] text-[var(--text-muted)]">
-                  {sel?.editState?.guideLines?.length ?? 0} guide line{(sel?.editState?.guideLines?.length ?? 0) !== 1 ? "s" : ""}
+                  {sel?.editState?.guideLines?.length ?? 0} dewarp guide{(sel?.editState?.guideLines?.length ?? 0) !== 1 ? "s" : ""}
                 </span>
                 <button
                   className="text-[10px] text-[var(--text-muted)] hover:text-[var(--danger)] transition-colors"
