@@ -5,7 +5,6 @@ import { useApp } from "../context/AppContext";
 import { rotateCanvas } from "../lib/crop";
 import { applyEraseMask, createEraseMask, paintBrushStroke, fillLassoRegion } from "../lib/eraser";
 import { drawProgressive } from "../lib/drawProgressive";
-import type { GuideLine } from "../lib/types";
 
 const LOUPE_CSS = 260;
 const LOUPE_ZOOM = 2.5;
@@ -32,12 +31,6 @@ export default function CropPreview({
   const sourceRef = useRef<HTMLCanvasElement | null>(null);
   // CSS display size → source pixel mapping
   const scaleInfoRef = useRef<{ cssW: number; cssH: number; srcW: number; srcH: number } | null>(null);
-
-  // Guide line interaction state
-  const guideDragRef = useRef<{ index: number; isLocal?: boolean } | null>(null);
-  // Guide line data refs for access in drawLoupe (which has [] deps)
-  const guideLinesRef = useRef<GuideLine[]>([]);
-  const showGuidesRef = useRef(false);
 
   const erasingRef = useRef(false);
   const brushPointsRef = useRef<[number, number][]>([]);
@@ -66,10 +59,6 @@ export default function CropPreview({
     (img) => img.id === state.selectedImageId,
   );
 
-  // Keep guide line refs in sync for drawLoupe access
-  guideLinesRef.current = selectedImage?.editState?.guideLines ?? [];
-  showGuidesRef.current = state.showGuides;
-
   // Map client coords to source coords. clamp=true allows out-of-bounds (for lasso).
   const clientToSource = useCallback(
     (clientX: number, clientY: number, clamp = false): [number, number] | null => {
@@ -83,14 +72,6 @@ export default function CropPreview({
       const sx = Math.max(0, Math.min(info.srcW - 1, relX * info.srcW));
       const sy = Math.max(0, Math.min(info.srcH - 1, relY * info.srcH));
       return [sx, sy];
-    },
-    [],
-  );
-
-  const getGuideLineAt = useCallback(
-    (_clientX: number, _clientY: number): number | null => {
-      // TODO: Task 5 will implement Bezier-based hit testing for guide lines
-      return null;
     },
     [],
   );
@@ -204,8 +185,6 @@ export default function CropPreview({
     ctx.moveTo(half, half + gap); ctx.lineTo(half, half + gap + armLen);
     ctx.stroke();
 
-    // TODO: Task 4 will implement Bezier guide line rendering in loupe
-
     // Position loupe near cursor (offset so it doesn't obscure the area)
     const containerRect = containerRef.current?.getBoundingClientRect();
     if (!containerRect) return;
@@ -291,8 +270,6 @@ export default function CropPreview({
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     drawProgressive(ctx, rotated, canvas.width, canvas.height);
-
-    // TODO: Task 4 will implement Bezier guide line rendering on crop preview
   }, [
     selectedImage?.cropCanvas,
     selectedImage?.filteredCanvas,
@@ -300,11 +277,11 @@ export default function CropPreview({
     selectedImage?.editState?.filterConfig?.type,
     selectedImage?.editState?.eraseMask,
     selectedImage?.originalCanvas,
-    state.showGuides,
-    selectedImage?.editState?.guideLines,
   ]);
 
-  drawRef.current = draw;
+  useEffect(() => {
+    drawRef.current = draw;
+  });
 
   useEffect(() => {
     draw();
@@ -331,27 +308,6 @@ export default function CropPreview({
     rafId = requestAnimationFrame(check);
     return () => cancelAnimationFrame(rafId);
   }, []);
-
-  // Handle Delete key to remove the last guide line
-  useEffect(() => {
-    if (!state.showGuides) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Delete" || e.key === "Backspace") {
-        const tag = (e.target as HTMLElement)?.tagName;
-        if (tag === "INPUT" || tag === "TEXTAREA") return;
-        const img = state.images.find((i) => i.id === state.selectedImageId);
-        if (!img?.editState) return;
-        const lines = [...img.editState.guideLines];
-        if (lines.length === 0) return;
-        e.preventDefault();
-        lines.pop();
-        dispatch({ type: "PUSH_HISTORY", id: img.id });
-        dispatch({ type: "SET_GUIDE_LINES", id: img.id, guideLines: lines });
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [state.showGuides, state.images, state.selectedImageId, dispatch]);
 
   // Draw brush strokes directly onto the display canvas (no React state update)
   const drawBrushOnCanvas = useCallback((points: [number, number][]) => {
@@ -472,52 +428,6 @@ export default function CropPreview({
     brushPointsRef.current = [];
   }, [eraserTool, selectedImage, getOrCreateMask, dispatch]);
 
-  // Guide line pointer handlers
-  const handleGuidePointerDown = useCallback(
-    (e: React.PointerEvent) => {
-      if (!state.showGuides || eraserActive) return;
-      const hitIdx = getGuideLineAt(e.clientX, e.clientY);
-      if (hitIdx != null) {
-        e.preventDefault();
-        (e.target as HTMLElement).setPointerCapture(e.pointerId);
-        const img = state.images.find((i) => i.id === state.selectedImageId);
-        if (img?.editState) {
-          dispatch({ type: "PUSH_HISTORY", id: img.id });
-        }
-        guideDragRef.current = {
-          index: hitIdx,
-          isLocal: false, // no longer used for dispatch, kept for compat
-        };
-      }
-    },
-    [state.showGuides, eraserActive, getGuideLineAt, state.images, state.selectedImageId, dispatch],
-  );
-
-  const handleGuidePointerMove = useCallback(
-    (e: React.PointerEvent) => {
-      // Update cursor when hovering near a guide line
-      if (state.showGuides && !eraserActive && !guideDragRef.current) {
-        const hitIdx = getGuideLineAt(e.clientX, e.clientY);
-        const container = containerRef.current;
-        if (container) {
-          container.style.cursor = hitIdx != null ? "ns-resize" : "";
-        }
-      }
-
-      // TODO: Task 5 will implement Bezier guide line dragging
-      if (!guideDragRef.current) return;
-    },
-    [state.showGuides, eraserActive, getGuideLineAt],
-  );
-
-  const handleGuidePointerUp = useCallback(
-    (_e: React.PointerEvent) => {
-      // TODO: Task 5 will implement Bezier guide line placement and drag-end logic
-      guideDragRef.current = null;
-    },
-    [],
-  );
-
   // Pointer handlers — direct DOM manipulation for 60fps loupe tracking
   const handlePointerMove = useCallback(
     (e: React.PointerEvent) => {
@@ -583,37 +493,10 @@ export default function CropPreview({
         cursor: eraserActive ? brushCursor : undefined,
         touchAction: eraserActive ? "none" : undefined,
       }}
-      onPointerMove={(e) => {
-        handlePointerMove(e);
-        handleGuidePointerMove(e);
-      }}
-      onPointerDown={(e) => {
-        if (eraserActive) {
-          handleEraserPointerDown(e);
-        } else {
-          handleGuidePointerDown(e);
-        }
-      }}
-      onPointerUp={(e) => {
-        if (eraserActive) {
-          handleEraserPointerUp();
-        }
-        handleGuidePointerUp(e);
-      }}
+      onPointerMove={handlePointerMove}
+      onPointerDown={eraserActive ? handleEraserPointerDown : undefined}
+      onPointerUp={eraserActive ? () => handleEraserPointerUp() : undefined}
       onPointerLeave={handlePointerLeave}
-      onContextMenu={(e) => {
-        if (!state.showGuides) return;
-        const hitIdx = getGuideLineAt(e.clientX, e.clientY);
-        if (hitIdx != null) {
-          e.preventDefault();
-          const img = state.images.find((i) => i.id === state.selectedImageId);
-          if (!img?.editState) return;
-          const lines = [...img.editState.guideLines];
-          lines.splice(hitIdx, 1);
-          dispatch({ type: "PUSH_HISTORY", id: img.id });
-          dispatch({ type: "SET_GUIDE_LINES", id: img.id, guideLines: lines });
-        }
-      }}
     >
       <canvas ref={canvasRef} aria-label="Crop preview" style={{ position: "absolute" }} />
       {/* Lasso processing spinner */}

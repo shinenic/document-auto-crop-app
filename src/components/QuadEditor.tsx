@@ -33,12 +33,12 @@ interface Props {
   onDragStart: () => void;
   onDragEnd: () => void;
   guideAddMode: boolean;
-  guideAddStep: "left" | "right" | null;
-  pendingLeftV: number | null;
+  guideAddStep?: "left" | "right" | null;
+  pendingLeftV?: number | null;
   onGuideAddClick: (mx: number, my: number) => void;
 }
 
-export default function QuadEditor({ onDragStart, onDragEnd, guideAddMode, guideAddStep, pendingLeftV, onGuideAddClick }: Props) {
+export default function QuadEditor({ onDragStart, onDragEnd, guideAddMode, onGuideAddClick }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const loupeRef = useRef<HTMLCanvasElement>(null);
   const { state, dispatch } = useApp();
