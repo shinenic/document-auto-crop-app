@@ -5,6 +5,7 @@ import { useApp } from "../context/AppContext";
 import { rotateCanvas } from "../lib/crop";
 import { applyEraseMask, createEraseMask, paintBrushStroke, fillLassoRegion } from "../lib/eraser";
 import { drawProgressive } from "../lib/drawProgressive";
+import type { GuideLine } from "../lib/types";
 
 const LOUPE_CSS = 260;
 const LOUPE_ZOOM = 2.5;
@@ -15,7 +16,7 @@ export default function CropPreview({
   eraserTool = "brush",
   brushSize = 20,
   previewBg = "checker",
-  guidePlacementAxis,
+  guidePlacementAxis = null,
   onGuidePlaced,
 }: {
   eraserActive?: boolean;
@@ -36,19 +37,18 @@ export default function CropPreview({
   // CSS display size → source pixel mapping
   const scaleInfoRef = useRef<{ cssW: number; cssH: number; srcW: number; srcH: number } | null>(null);
 
+  // Guide line interaction state
+  const guideDragRef = useRef<{ index: number; isLocal?: boolean } | null>(null);
+  // Guide line data refs for access in drawLoupe (which has [] deps)
+  const guideLinesRef = useRef<GuideLine[]>([]);
+  const showGuidesRef = useRef(false);
+
   const erasingRef = useRef(false);
   const brushPointsRef = useRef<[number, number][]>([]);
   const lassoPointsRef = useRef<[number, number][]>([]);
   const overlayRef = useRef<HTMLCanvasElement>(null);
   // Working mask: mutated during drag, committed to state on mouseUp
   const workingMaskRef = useRef<import("../lib/types").EraseMask | null>(null);
-
-  // Guide line drag state
-  const guideDragRef = useRef<{ index: number } | null>(null);
-
-  // Refs for loupe rendering (synced via useEffect to avoid lint errors)
-  const guideLinesRef = useRef<{ pos: number; axis: "h" | "v" }[]>([]);
-  const showGuidesRef = useRef(false);
 
   // Reset eraser state when switching tools or deactivating
   useEffect(() => {
@@ -63,19 +63,16 @@ export default function CropPreview({
     }
   }, [eraserTool, eraserActive]);
 
-  // Sync guide line refs for loupe rendering
-  useEffect(() => {
-    const sel = state.images.find((img) => img.id === state.selectedImageId);
-    guideLinesRef.current = sel?.editState?.guideLines ?? [];
-    showGuidesRef.current = state.showGuides;
-  });
-
   const [loupeVisible, setLoupeVisible] = useState(false);
   const [lassoProcessing, setLassoProcessing] = useState(false);
 
   const selectedImage = state.images.find(
     (img) => img.id === state.selectedImageId,
   );
+
+  // Keep guide line refs in sync for drawLoupe access
+  guideLinesRef.current = selectedImage?.editState?.guideLines ?? [];
+  showGuidesRef.current = state.showGuides;
 
   // Map client coords to source coords. clamp=true allows out-of-bounds (for lasso).
   const clientToSource = useCallback(
@@ -94,7 +91,6 @@ export default function CropPreview({
     [],
   );
 
-  // Hit-test: find guide line index near the given client coordinates
   const getGuideLineAt = useCallback(
     (clientX: number, clientY: number): number | null => {
       const canvas = canvasRef.current;
@@ -102,7 +98,8 @@ export default function CropPreview({
       const rect = canvas.getBoundingClientRect();
       const relX = (clientX - rect.left) / rect.width;
       const relY = (clientY - rect.top) / rect.height;
-      const lines = selectedImage?.editState?.guideLines ?? [];
+      const img = state.images.find((i) => i.id === state.selectedImageId);
+      const lines = img?.editState?.guideLines ?? [];
       const hitThreshold = 8 / Math.max(rect.width, rect.height);
       for (let i = 0; i < lines.length; i++) {
         if (lines[i].axis === "h" && Math.abs(lines[i].pos - relY) < hitThreshold) return i;
@@ -110,7 +107,7 @@ export default function CropPreview({
       }
       return null;
     },
-    [selectedImage?.editState?.guideLines],
+    [state.images, state.selectedImageId],
   );
 
   const getOrCreateMask = useCallback((): import("../lib/types").EraseMask | null => {
@@ -226,12 +223,13 @@ export default function CropPreview({
     if (showGuidesRef.current) {
       const guideLines = guideLinesRef.current;
       ctx.save();
-      ctx.strokeStyle = "rgba(92, 224, 194, 0.5)";
+      ctx.strokeStyle = "rgba(255, 60, 60, 0.5)";
       ctx.lineWidth = 2 * dpr;
-      ctx.shadowColor = "rgba(92, 224, 194, 0.3)";
+      ctx.shadowColor = "rgba(255, 60, 60, 0.3)";
       ctx.shadowBlur = 2 * dpr;
       for (const line of guideLines) {
         if (line.axis === "h") {
+          // Horizontal line: map Y percentage to loupe pixel
           const lineY = line.pos * info.srcH;
           const loupeY = ((lineY - (srcY - regionH / 2)) / regionH) * loupePx;
           if (loupeY >= 0 && loupeY <= loupePx) {
@@ -241,6 +239,7 @@ export default function CropPreview({
             ctx.stroke();
           }
         } else {
+          // Vertical line: map X percentage to loupe pixel
           const lineX = line.pos * info.srcW;
           const loupeX = ((lineX - (srcX - regionW / 2)) / regionW) * loupePx;
           if (loupeX >= 0 && loupeX <= loupePx) {
@@ -340,15 +339,14 @@ export default function CropPreview({
     if (!ctx) return;
     drawProgressive(ctx, rotated, canvas.width, canvas.height);
 
-    // Draw reference guide lines
+    // Draw guide lines
     if (state.showGuides) {
       const lines = selectedImage?.editState?.guideLines ?? [];
       if (lines.length > 0) {
         ctx.save();
-        const dpr = window.devicePixelRatio || 1;
-        ctx.lineWidth = 1 * dpr;
-        ctx.strokeStyle = "rgba(92, 224, 194, 0.5)";
-        ctx.shadowColor = "rgba(92, 224, 194, 0.3)";
+        ctx.lineWidth = 2 * dpr;
+        ctx.strokeStyle = "rgba(255, 60, 60, 0.5)";
+        ctx.shadowColor = "rgba(255, 60, 60, 0.3)";
         ctx.shadowBlur = 3 * dpr;
         for (const line of lines) {
           ctx.beginPath();
@@ -372,14 +370,12 @@ export default function CropPreview({
     selectedImage?.editState?.rotation,
     selectedImage?.editState?.filterConfig?.type,
     selectedImage?.editState?.eraseMask,
-    selectedImage?.editState?.guideLines,
     selectedImage?.originalCanvas,
     state.showGuides,
+    selectedImage?.editState?.guideLines,
   ]);
 
-  useEffect(() => {
-    drawRef.current = draw;
-  });
+  drawRef.current = draw;
 
   useEffect(() => {
     draw();
@@ -406,6 +402,27 @@ export default function CropPreview({
     rafId = requestAnimationFrame(check);
     return () => cancelAnimationFrame(rafId);
   }, []);
+
+  // Handle Delete key to remove the last guide line
+  useEffect(() => {
+    if (!state.showGuides) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Delete" || e.key === "Backspace") {
+        const tag = (e.target as HTMLElement)?.tagName;
+        if (tag === "INPUT" || tag === "TEXTAREA") return;
+        const img = state.images.find((i) => i.id === state.selectedImageId);
+        if (!img?.editState) return;
+        const lines = [...img.editState.guideLines];
+        if (lines.length === 0) return;
+        e.preventDefault();
+        lines.pop();
+        dispatch({ type: "PUSH_HISTORY", id: img.id });
+        dispatch({ type: "SET_GUIDE_LINES", id: img.id, guideLines: lines });
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [state.showGuides, state.images, state.selectedImageId, dispatch]);
 
   // Draw brush strokes directly onto the display canvas (no React state update)
   const drawBrushOnCanvas = useCallback((points: [number, number][]) => {
@@ -526,6 +543,113 @@ export default function CropPreview({
     brushPointsRef.current = [];
   }, [eraserTool, selectedImage, getOrCreateMask, dispatch]);
 
+  // Guide line pointer handlers
+  const handleGuidePointerDown = useCallback(
+    (e: React.PointerEvent) => {
+      if (!state.showGuides || eraserActive) return;
+      const hitIdx = getGuideLineAt(e.clientX, e.clientY);
+      if (hitIdx != null) {
+        e.preventDefault();
+        (e.target as HTMLElement).setPointerCapture(e.pointerId);
+        const img = state.images.find((i) => i.id === state.selectedImageId);
+        if (img?.editState) {
+          dispatch({ type: "PUSH_HISTORY", id: img.id });
+        }
+        guideDragRef.current = {
+          index: hitIdx,
+          isLocal: false, // no longer used for dispatch, kept for compat
+        };
+      }
+    },
+    [state.showGuides, eraserActive, getGuideLineAt, state.images, state.selectedImageId, dispatch],
+  );
+
+  const handleGuidePointerMove = useCallback(
+    (e: React.PointerEvent) => {
+      // Update cursor when hovering near a guide line
+      if (state.showGuides && !eraserActive && !guideDragRef.current) {
+        const hitIdx = getGuideLineAt(e.clientX, e.clientY);
+        const container = containerRef.current;
+        if (container) {
+          if (hitIdx != null) {
+            const img = state.images.find((i) => i.id === state.selectedImageId);
+            const lines = img?.editState?.guideLines ?? [];
+            container.style.cursor = lines[hitIdx]?.axis === "h" ? "ns-resize" : "ew-resize";
+          } else {
+            container.style.cursor = "";
+          }
+        }
+      }
+
+      if (!guideDragRef.current) return;
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const rect = canvas.getBoundingClientRect();
+      const relX = (e.clientX - rect.left) / rect.width;
+      const relY = (e.clientY - rect.top) / rect.height;
+      const { index } = guideDragRef.current;
+      const img = state.images.find((i) => i.id === state.selectedImageId);
+      if (!img?.editState) return;
+      const lines = [...img.editState.guideLines];
+      const axis = lines[index].axis;
+      lines[index] = { ...lines[index], pos: Math.max(0, Math.min(1, axis === "h" ? relY : relX)) };
+      dispatch({ type: "SET_GUIDE_LINES", id: img.id, guideLines: lines });
+    },
+    [state.showGuides, eraserActive, getGuideLineAt, state.images, state.selectedImageId, dispatch],
+  );
+
+  const handleGuidePointerUp = useCallback(
+    (e: React.PointerEvent) => {
+      if (!guideDragRef.current) {
+        // Click-to-place: only if in placement mode, guides active, eraser inactive
+        if (guidePlacementAxis && state.showGuides && !eraserActive) {
+          const canvas = canvasRef.current;
+          if (!canvas) return;
+          const rect = canvas.getBoundingClientRect();
+          const relX = (e.clientX - rect.left) / rect.width;
+          const relY = (e.clientY - rect.top) / rect.height;
+          if (relX < 0 || relX > 1 || relY < 0 || relY > 1) return;
+          // Don't place on an existing line
+          const hitIdx = getGuideLineAt(e.clientX, e.clientY);
+          if (hitIdx != null) return;
+          const img = state.images.find((i) => i.id === state.selectedImageId);
+          if (!img?.editState) return;
+          const lines = [...img.editState.guideLines];
+          const pos = guidePlacementAxis === "h" ? relY : relX;
+          lines.push({ pos, axis: guidePlacementAxis });
+          dispatch({ type: "PUSH_HISTORY", id: img.id });
+          dispatch({ type: "SET_GUIDE_LINES", id: img.id, guideLines: lines });
+          onGuidePlaced?.();
+        }
+        return;
+      }
+
+      // Drag end — remove if dragged outside canvas (history already pushed on drag start)
+      const canvas = canvasRef.current;
+      if (canvas) {
+        const rect = canvas.getBoundingClientRect();
+        const relX = (e.clientX - rect.left) / rect.width;
+        const relY = (e.clientY - rect.top) / rect.height;
+        const { index } = guideDragRef.current;
+        const img = state.images.find((i) => i.id === state.selectedImageId);
+        if (img?.editState) {
+          const lines = [...img.editState.guideLines];
+          const axis = lines[index].axis;
+          const outOfBounds = axis === "h"
+            ? (relY < -0.02 || relY > 1.02)
+            : (relX < -0.02 || relX > 1.02);
+          if (outOfBounds) {
+            // Dragged out — remove this line
+            lines.splice(index, 1);
+            dispatch({ type: "SET_GUIDE_LINES", id: img.id, guideLines: lines });
+          }
+        }
+      }
+      guideDragRef.current = null;
+    },
+    [state.showGuides, eraserActive, guidePlacementAxis, onGuidePlaced, getGuideLineAt, state.images, state.selectedImageId, dispatch],
+  );
+
   // Pointer handlers — direct DOM manipulation for 60fps loupe tracking
   const handlePointerMove = useCallback(
     (e: React.PointerEvent) => {
@@ -554,127 +678,14 @@ export default function CropPreview({
     }
   }, [selectedImage?.cropCanvas, selectedImage?.editState?.rotation, selectedImage?.filteredCanvas]);
 
-  // Guide placement click handler
-  const handleGuidePlacementDown = useCallback(
-    (e: React.PointerEvent) => {
-      if (!guidePlacementAxis || eraserActive || !selectedImage?.id) return false;
-      const canvas = canvasRef.current;
-      if (!canvas) return false;
-      const rect = canvas.getBoundingClientRect();
-      const pos = guidePlacementAxis === "h"
-        ? (e.clientY - rect.top) / rect.height
-        : (e.clientX - rect.left) / rect.width;
-      if (pos >= 0 && pos <= 1) {
-        const currentLines = selectedImage?.editState?.guideLines ?? [];
-        dispatch({ type: "SET_GUIDE_LINES", id: selectedImage.id, guideLines: [...currentLines, { pos, axis: guidePlacementAxis }] });
-        onGuidePlaced?.();
-      }
-      return true;
-    },
-    [guidePlacementAxis, eraserActive, selectedImage, dispatch, onGuidePlaced],
-  );
-
-  // Guide line drag handlers
-  const handleGuidePointerDown = useCallback(
-    (e: React.PointerEvent) => {
-      if (!state.showGuides || eraserActive) return;
-      const hitIdx = getGuideLineAt(e.clientX, e.clientY);
-      if (hitIdx != null) {
-        e.preventDefault();
-        (e.target as HTMLElement).setPointerCapture(e.pointerId);
-        guideDragRef.current = { index: hitIdx };
-      }
-    },
-    [state.showGuides, eraserActive, getGuideLineAt],
-  );
-
-  const handleGuidePointerMove = useCallback(
-    (e: React.PointerEvent) => {
-      // Update cursor when hovering near a guide line
-      if (state.showGuides && !eraserActive && !guideDragRef.current) {
-        const hitIdx = getGuideLineAt(e.clientX, e.clientY);
-        const container = containerRef.current;
-        if (container) {
-          if (hitIdx != null) {
-            const lines = selectedImage?.editState?.guideLines ?? [];
-            container.style.cursor = lines[hitIdx]?.axis === "h" ? "ns-resize" : "ew-resize";
-          } else {
-            container.style.cursor = "";
-          }
-        }
-      }
-
-      if (!guideDragRef.current || !selectedImage?.id) return;
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      const rect = canvas.getBoundingClientRect();
-      const relX = (e.clientX - rect.left) / rect.width;
-      const relY = (e.clientY - rect.top) / rect.height;
-      const { index } = guideDragRef.current;
-      const lines = [...(selectedImage?.editState?.guideLines ?? [])];
-      const axis = lines[index].axis;
-      lines[index] = { ...lines[index], pos: Math.max(0, Math.min(1, axis === "h" ? relY : relX)) };
-      dispatch({ type: "SET_GUIDE_LINES", id: selectedImage.id, guideLines: lines });
-    },
-    [state.showGuides, eraserActive, getGuideLineAt, selectedImage, dispatch],
-  );
-
-  const handleGuidePointerUp = useCallback(
-    (e: React.PointerEvent) => {
-      if (!guideDragRef.current) {
-        // Click-to-place handled by handleGuidePlacementDown
-        return;
-      }
-
-      // Drag end — remove if dragged outside canvas
-      const canvas = canvasRef.current;
-      if (canvas && selectedImage?.id) {
-        const rect = canvas.getBoundingClientRect();
-        const relX = (e.clientX - rect.left) / rect.width;
-        const relY = (e.clientY - rect.top) / rect.height;
-        const { index } = guideDragRef.current;
-        const lines = [...(selectedImage?.editState?.guideLines ?? [])];
-        const axis = lines[index].axis;
-        const outOfBounds = axis === "h"
-          ? (relY < -0.02 || relY > 1.02)
-          : (relX < -0.02 || relX > 1.02);
-        if (outOfBounds) {
-          lines.splice(index, 1);
-          dispatch({ type: "SET_GUIDE_LINES", id: selectedImage.id, guideLines: lines });
-        }
-      }
-      guideDragRef.current = null;
-    },
-    [selectedImage, dispatch],
-  );
-
   const brushCursor = useMemo(() => {
-    if (guidePlacementAxis && !eraserActive) return "crosshair";
     if (!eraserActive || eraserTool !== "brush") return "crosshair";
     const r = Math.max(2, Math.round(brushSize * cursorScale));
     const size = r * 2 + 2;
     const half = size / 2;
     const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='${size}' height='${size}'><circle cx='${half}' cy='${half}' r='${r}' fill='none' stroke='white' stroke-width='1.5'/><circle cx='${half}' cy='${half}' r='${r}' fill='none' stroke='black' stroke-width='0.5'/></svg>`;
     return `url("data:image/svg+xml,${encodeURIComponent(svg)}") ${half} ${half}, crosshair`;
-  }, [eraserActive, eraserTool, brushSize, cursorScale, guidePlacementAxis]);
-
-  // Delete/Backspace removes the last reference line
-  useEffect(() => {
-    if (!state.showGuides || !selectedImage?.id) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Delete" || e.key === "Backspace") {
-        const tag = (e.target as HTMLElement)?.tagName;
-        if (tag === "INPUT" || tag === "TEXTAREA") return;
-        const lines = [...(selectedImage?.editState?.guideLines ?? [])];
-        if (lines.length === 0) return;
-        e.preventDefault();
-        lines.pop();
-        dispatch({ type: "SET_GUIDE_LINES", id: selectedImage.id, guideLines: lines });
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [state.showGuides, selectedImage, dispatch]);
+  }, [eraserActive, eraserTool, brushSize, cursorScale]);
 
   if (!selectedImage || selectedImage.status !== "ready") {
     return (
@@ -701,7 +712,7 @@ export default function CropPreview({
         } : {
           backgroundColor: previewBg === "black" ? "#000" : previewBg === "white" ? "#fff" : "#555",
         }),
-        cursor: guidePlacementAxis ? "crosshair" : eraserActive ? brushCursor : undefined,
+        cursor: eraserActive ? brushCursor : guidePlacementAxis ? "crosshair" : undefined,
         touchAction: eraserActive ? "none" : undefined,
       }}
       onPointerMove={(e) => {
@@ -709,7 +720,6 @@ export default function CropPreview({
         handleGuidePointerMove(e);
       }}
       onPointerDown={(e) => {
-        if (handleGuidePlacementDown(e)) return;
         if (eraserActive) {
           handleEraserPointerDown(e);
         } else {
@@ -724,13 +734,16 @@ export default function CropPreview({
       }}
       onPointerLeave={handlePointerLeave}
       onContextMenu={(e) => {
-        if (!state.showGuides || !selectedImage?.id) return;
+        if (!state.showGuides) return;
         const hitIdx = getGuideLineAt(e.clientX, e.clientY);
         if (hitIdx != null) {
           e.preventDefault();
-          const lines = [...(selectedImage?.editState?.guideLines ?? [])];
+          const img = state.images.find((i) => i.id === state.selectedImageId);
+          if (!img?.editState) return;
+          const lines = [...img.editState.guideLines];
           lines.splice(hitIdx, 1);
-          dispatch({ type: "SET_GUIDE_LINES", id: selectedImage.id, guideLines: lines });
+          dispatch({ type: "PUSH_HISTORY", id: img.id });
+          dispatch({ type: "SET_GUIDE_LINES", id: img.id, guideLines: lines });
         }
       }}
     >
