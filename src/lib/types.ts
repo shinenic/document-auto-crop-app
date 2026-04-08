@@ -115,8 +115,8 @@ export interface AppState {
 // --- Selection ---
 
 export interface PointSelection {
-  type: "corner" | "cp1" | "cp2" | "edge";
-  edgeIdx: number;
+  type: "corner" | "cp1" | "cp2" | "edge" | "guide-left" | "guide-right" | "guide-cp1" | "guide-cp2" | "guide-body";
+  edgeIdx: number;  // for quad points: edge index; for guide points: guide line index
 }
 
 // --- Constants ---

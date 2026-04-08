@@ -4,6 +4,7 @@ import { useRef, useState, useEffect, useCallback } from "react";
 import { useApp } from "../context/AppContext";
 import type { PointSelection } from "../lib/types";
 import { renderMaskOverlay } from "../lib/overlay";
+import { evalBezier } from "../lib/crop";
 
 const LOUPE_CSS = 320;
 const LOUPE_ZOOM_CORNER = 3;
@@ -20,6 +21,13 @@ const CORNER_FILL_SEL = "rgba(232, 85, 85, 0.35)";
 const EDGE_HANDLE_FILL = "rgba(255, 180, 60, 0.55)";
 const EDGE_HANDLE_FILL_SEL = "rgba(255, 180, 60, 0.8)";
 const EDGE_HANDLE_GLOW = "rgba(255, 180, 60, 0.3)";
+
+const GUIDE_LINE_STROKE = "rgba(245, 158, 11, 0.8)";
+const GUIDE_LINE_STROKE_SEL = "rgba(245, 158, 11, 1)";
+const GUIDE_CP_FILL = "rgba(245, 158, 11, 0.4)";
+const GUIDE_CP_FILL_SEL = "rgba(245, 158, 11, 0.7)";
+const GUIDE_EP_FILL = "rgba(245, 158, 11, 0.5)";
+const GUIDE_EP_FILL_SEL = "rgba(245, 158, 11, 0.8)";
 
 interface Props {
   onDragStart: () => void;
@@ -269,14 +277,94 @@ export default function QuadEditor({ onDragStart, onDragEnd }: Props) {
       ctx.lineWidth = sel ? 6 : 5;
       ctx.stroke();
     }
+
+    // Draw guide lines
+    const { guideLines } = editState;
+    const glLw = Math.max(2, Math.round(imgW / 300));
+    const glR = Math.max(5, Math.round(imgW / 90));
+    const glRSel = Math.max(8, Math.round(imgW / 60));
+    const glCpR = Math.max(4, Math.round(imgW / 100));
+    const glCpRSel = Math.max(7, Math.round(imgW / 70));
+
+    for (let gi = 0; gi < guideLines.length; gi++) {
+      const g = guideLines[gi];
+      const p0 = evalBezier(corners[0], edgeFits[3].cp2, edgeFits[3].cp1, corners[3], g.leftV);
+      const p3 = evalBezier(corners[1], edgeFits[1].cp1, edgeFits[1].cp2, corners[2], g.rightV);
+
+      // Bezier curve
+      ctx.beginPath();
+      ctx.moveTo(p0[0] * sx, p0[1] * sy);
+      ctx.bezierCurveTo(g.cp1[0] * sx, g.cp1[1] * sy, g.cp2[0] * sx, g.cp2[1] * sy, p3[0] * sx, p3[1] * sy);
+      const isBodySel = selected?.type === "guide-body" && selected.edgeIdx === gi;
+      ctx.lineWidth = isBodySel ? glLw * 1.5 : glLw;
+      ctx.strokeStyle = isBodySel ? GUIDE_LINE_STROKE_SEL : GUIDE_LINE_STROKE;
+      ctx.stroke();
+
+      // CP guide lines (dashed)
+      ctx.setLineDash([4, 4]);
+      ctx.lineWidth = Math.max(1, glLw / 2);
+      ctx.strokeStyle = "rgba(245, 158, 11, 0.3)";
+      ctx.beginPath(); ctx.moveTo(p0[0] * sx, p0[1] * sy); ctx.lineTo(g.cp1[0] * sx, g.cp1[1] * sy); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(p3[0] * sx, p3[1] * sy); ctx.lineTo(g.cp2[0] * sx, g.cp2[1] * sy); ctx.stroke();
+      ctx.setLineDash([]);
+
+      // CPs (diamonds)
+      for (const [cpKey, cp] of [["guide-cp1", g.cp1], ["guide-cp2", g.cp2]] as const) {
+        const isSel = selected?.type === cpKey && selected.edgeIdx === gi;
+        const r = isSel ? glCpRSel : glCpR;
+        const cx = cp[0] * sx, cy = cp[1] * sy;
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(Math.PI / 4);
+        ctx.fillStyle = isSel ? GUIDE_CP_FILL_SEL : GUIDE_CP_FILL;
+        ctx.fillRect(-r, -r, r * 2, r * 2);
+        ctx.strokeStyle = "#fff";
+        ctx.lineWidth = Math.max(1, glLw / 3);
+        ctx.strokeRect(-r, -r, r * 2, r * 2);
+        ctx.restore();
+      }
+
+      // Endpoints (circles)
+      for (const [epKey, ep] of [["guide-left", p0], ["guide-right", p3]] as const) {
+        const isSel = selected?.type === epKey && selected.edgeIdx === gi;
+        const r = isSel ? glRSel : glR;
+        ctx.beginPath();
+        ctx.arc(ep[0] * sx, ep[1] * sy, r, 0, 2 * Math.PI);
+        ctx.fillStyle = isSel ? GUIDE_EP_FILL_SEL : GUIDE_EP_FILL;
+        ctx.fill();
+        ctx.strokeStyle = "#fff";
+        ctx.lineWidth = Math.max(1.5, glLw / 2);
+        ctx.stroke();
+      }
+    }
   }, [baseCanvas, editState, selected, imgW, imgH, canW, canH, padX, padY, maskWidth, maskHeight]);
 
   useEffect(() => { draw(); drawLoupe(); }, [draw, drawLoupe]);
 
+  // --- Delete guide line on Delete/Backspace ---
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (!selected || !editState || !selectedImage) return;
+      if (e.key !== "Delete" && e.key !== "Backspace") return;
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      if (selected.type.startsWith("guide-")) {
+        e.preventDefault();
+        const gi = selected.edgeIdx;
+        dispatch({ type: "PUSH_HISTORY", id: selectedImage.id });
+        const guideLines = editState.guideLines.filter((_, i) => i !== gi);
+        dispatch({ type: "SET_EDIT_STATE", id: selectedImage.id, editState: { ...editState, guideLines } });
+        setSelected(null);
+      }
+    };
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [selected, editState, selectedImage, dispatch]);
+
   // --- Hit detection ---
   const getAllPoints = useCallback(() => {
     if (!editState) return [];
-    const pts: { type: "corner" | "cp1" | "cp2" | "edge"; edgeIdx: number; pos: [number, number] }[] = [];
+    const pts: { type: PointSelection["type"]; edgeIdx: number; pos: [number, number] }[] = [];
     for (let i = 0; i < 4; i++) {
       pts.push({ type: "corner", edgeIdx: i, pos: editState.corners[i] });
     }
@@ -291,6 +379,18 @@ export default function QuadEditor({ onDragStart, onDragEnd }: Props) {
       const s = editState.corners[i];
       const e = editState.corners[(i + 1) % 4];
       pts.push({ type: "edge", edgeIdx: i, pos: [(s[0] + e[0]) / 2, (s[1] + e[1]) / 2] });
+    }
+    // Guide line hit targets
+    for (let gi = 0; gi < editState.guideLines.length; gi++) {
+      const g = editState.guideLines[gi];
+      const p0 = evalBezier(editState.corners[0], editState.edgeFits[3].cp2, editState.edgeFits[3].cp1, editState.corners[3], g.leftV);
+      const p3 = evalBezier(editState.corners[1], editState.edgeFits[1].cp1, editState.edgeFits[1].cp2, editState.corners[2], g.rightV);
+      pts.push({ type: "guide-left", edgeIdx: gi, pos: p0 });
+      pts.push({ type: "guide-right", edgeIdx: gi, pos: p3 });
+      pts.push({ type: "guide-cp1", edgeIdx: gi, pos: g.cp1 });
+      pts.push({ type: "guide-cp2", edgeIdx: gi, pos: g.cp2 });
+      const mid = evalBezier(p0, g.cp1, g.cp2, p3, 0.5);
+      pts.push({ type: "guide-body", edgeIdx: gi, pos: mid });
     }
     return pts;
   }, [editState]);
@@ -460,6 +560,56 @@ export default function QuadEditor({ onDragStart, onDragEnd }: Props) {
           id: selectedImage.id,
           editState: { ...editState, edgeFits },
         });
+      } else if (type === "guide-body") {
+        const gi = edgeIdx;
+        const g = editState.guideLines[gi];
+        const p0 = evalBezier(editState.corners[0], editState.edgeFits[3].cp2, editState.edgeFits[3].cp1, editState.corners[3], g.leftV);
+        const p3 = evalBezier(editState.corners[1], editState.edgeFits[1].cp1, editState.edgeFits[1].cp2, editState.corners[2], g.rightV);
+        const midY = (p0[1] + p3[1]) / 2;
+        const deltaY = my - midY;
+        const lRange = Math.hypot(editState.corners[3][0] - editState.corners[0][0], editState.corners[3][1] - editState.corners[0][1]);
+        const rRange = Math.hypot(editState.corners[2][0] - editState.corners[1][0], editState.corners[2][1] - editState.corners[1][1]);
+        const deltaLV = deltaY / (lRange || 1);
+        const deltaRV = deltaY / (rRange || 1);
+        const newLeftV = Math.max(0.01, Math.min(0.99, g.leftV + deltaLV));
+        const newRightV = Math.max(0.01, Math.min(0.99, g.rightV + deltaRV));
+        const newP0 = evalBezier(editState.corners[0], editState.edgeFits[3].cp2, editState.edgeFits[3].cp1, editState.corners[3], newLeftV);
+        const newP3 = evalBezier(editState.corners[1], editState.edgeFits[1].cp1, editState.edgeFits[1].cp2, editState.corners[2], newRightV);
+        const guideLines = editState.guideLines.map((gl, i) => i === gi ? {
+          leftV: newLeftV, rightV: newRightV,
+          cp1: [g.cp1[0] + (newP0[0] - p0[0]), g.cp1[1] + (newP0[1] - p0[1])] as [number, number],
+          cp2: [g.cp2[0] + (newP3[0] - p3[0]), g.cp2[1] + (newP3[1] - p3[1])] as [number, number],
+        } : { ...gl });
+        dispatch({ type: "SET_EDIT_STATE", id: selectedImage.id, editState: { ...editState, guideLines } });
+      } else if (type === "guide-left" || type === "guide-right") {
+        const gi = edgeIdx;
+        const g = editState.guideLines[gi];
+        const isLeft = type === "guide-left";
+        const edgePts = isLeft
+          ? { p0: editState.corners[0], cp1: editState.edgeFits[3].cp2, cp2: editState.edgeFits[3].cp1, p3: editState.corners[3] }
+          : { p0: editState.corners[1], cp1: editState.edgeFits[1].cp1, cp2: editState.edgeFits[1].cp2, p3: editState.corners[2] };
+        let bestV = isLeft ? g.leftV : g.rightV;
+        let bestDist = Infinity;
+        for (let step = 0; step < 50; step++) {
+          const v = step / 49;
+          const pt = evalBezier(edgePts.p0, edgePts.cp1, edgePts.cp2, edgePts.p3, v);
+          const d = Math.hypot(pt[0] - mx, pt[1] - my);
+          if (d < bestDist) { bestDist = d; bestV = v; }
+        }
+        bestV = Math.max(0.01, Math.min(0.99, bestV));
+        const guideLines = editState.guideLines.map((gl, i) => {
+          if (i !== gi) return { ...gl };
+          return isLeft ? { ...gl, leftV: bestV } : { ...gl, rightV: bestV };
+        });
+        dispatch({ type: "SET_EDIT_STATE", id: selectedImage.id, editState: { ...editState, guideLines } });
+      } else if (type === "guide-cp1" || type === "guide-cp2") {
+        const gi = edgeIdx;
+        const cpKey = type === "guide-cp1" ? "cp1" : "cp2";
+        const guideLines = editState.guideLines.map((gl, i) => {
+          if (i !== gi) return { ...gl };
+          return { ...gl, [cpKey]: clampToContainer(mx, my) };
+        });
+        dispatch({ type: "SET_EDIT_STATE", id: selectedImage.id, editState: { ...editState, guideLines } });
       }
     },
     [dragging, selected, editState, selectedImage, toMaskFromPointer, dispatch, onDragStart, maskToCanvas, clampToImage, clampToContainer],
