@@ -67,9 +67,27 @@ export default function EditorScreen() {
       }
       if (e.key === "Escape") {
         if (guideAddMode) { setGuideAddMode(false); setGuideAddStep(null); setPendingLeftV(null); setPendingP0(null); return; }
+        if (guidePlacementAxis) { setGuidePlacementAxis(null); return; }
         if (shortcutsOpen) { setShortcutsOpen(false); return; }
         if (eraserActive) { setEraserActive(false); return; }
         return;
+      }
+      if (e.key.toLowerCase() === "g" && !eraserActive) {
+        e.preventDefault();
+        dispatch({ type: "TOGGLE_GUIDES" });
+        return;
+      }
+      if (stateRef.current.showGuides && !eraserActive) {
+        if (e.key.toLowerCase() === "h") {
+          e.preventDefault();
+          setGuidePlacementAxis((v) => v === "h" ? null : "h");
+          return;
+        }
+        if (e.key.toLowerCase() === "v") {
+          e.preventDefault();
+          setGuidePlacementAxis((v) => v === "v" ? null : "v");
+          return;
+        }
       }
       if (e.key.toLowerCase() === "e" && isBW) {
         e.preventDefault();
@@ -101,7 +119,7 @@ export default function EditorScreen() {
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [eraserActive, shortcutsOpen, guideAddMode, dispatch]);
+  }, [eraserActive, shortcutsOpen, guideAddMode, guidePlacementAxis, dispatch]);
 
   const selectedImage = getSelectedImage(state);
 
