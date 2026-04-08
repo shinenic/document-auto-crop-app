@@ -1,4 +1,4 @@
-import type { ImageEntry, EditState, EdgeFit, EraseMask, QuadResult, ImageHistory, GuideLine } from "./types";
+import type { ImageEntry, EditState, EdgeFit, EraseMask, QuadResult, ImageHistory } from "./types";
 
 // --- Manifest Types ---
 
@@ -18,10 +18,10 @@ export interface ManifestImage {
 interface ManifestEditState {
   corners: [number, number][];
   edgeFits: EdgeFit[];
+  guideLines?: { leftV: number; rightV: number; cp1: [number, number]; cp2: [number, number] }[];
   rotation: 0 | 90 | 180 | 270;
   filterConfig: { type: "none" | "binarize"; binarize: { blockRadiusBps: number; contrastOffset: number; upsamplingScale: number } };
   eraseMaskFile: string | null;
-  guideLines: GuideLine[];
 }
 
 interface Manifest {
@@ -51,10 +51,10 @@ function editStateToManifest(es: EditState, eraseMaskFile: string | null): Manif
   return {
     corners: es.corners.map(c => [...c] as [number, number]),
     edgeFits: es.edgeFits.map(f => ({ cp1: [...f.cp1] as [number, number], cp2: [...f.cp2] as [number, number], isArc: f.isArc })),
+    guideLines: es.guideLines.map(g => ({ leftV: g.leftV, rightV: g.rightV, cp1: [...g.cp1] as [number, number], cp2: [...g.cp2] as [number, number] })),
     rotation: es.rotation,
     filterConfig: { type: es.filterConfig.type, binarize: { ...es.filterConfig.binarize } },
     eraseMaskFile,
-    guideLines: es.guideLines.map(g => ({ ...g })),
   };
 }
 
@@ -62,10 +62,10 @@ function manifestToEditState(m: ManifestEditState, eraseMask: EraseMask | null):
   return {
     corners: m.corners.map(c => [...c] as [number, number]),
     edgeFits: m.edgeFits.map(f => ({ cp1: [...f.cp1] as [number, number], cp2: [...f.cp2] as [number, number], isArc: f.isArc })),
+    guideLines: (m.guideLines ?? []).map(g => ({ leftV: g.leftV, rightV: g.rightV, cp1: [...g.cp1] as [number, number], cp2: [...g.cp2] as [number, number] })),
     rotation: m.rotation,
     filterConfig: { type: m.filterConfig.type, binarize: { ...m.filterConfig.binarize } },
     eraseMask,
-    guideLines: m.guideLines ?? [],
   };
 }
 

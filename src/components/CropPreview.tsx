@@ -92,22 +92,11 @@ export default function CropPreview({
   );
 
   const getGuideLineAt = useCallback(
-    (clientX: number, clientY: number): number | null => {
-      const canvas = canvasRef.current;
-      if (!canvas) return null;
-      const rect = canvas.getBoundingClientRect();
-      const relX = (clientX - rect.left) / rect.width;
-      const relY = (clientY - rect.top) / rect.height;
-      const img = state.images.find((i) => i.id === state.selectedImageId);
-      const lines = img?.editState?.guideLines ?? [];
-      const hitThreshold = 8 / Math.max(rect.width, rect.height);
-      for (let i = 0; i < lines.length; i++) {
-        if (lines[i].axis === "h" && Math.abs(lines[i].pos - relY) < hitThreshold) return i;
-        if (lines[i].axis === "v" && Math.abs(lines[i].pos - relX) < hitThreshold) return i;
-      }
+    (_clientX: number, _clientY: number): number | null => {
+      // TODO: Task 5 will implement Bezier-based hit testing for guide lines
       return null;
     },
-    [state.images, state.selectedImageId],
+    [],
   );
 
   const getOrCreateMask = useCallback((): import("../lib/types").EraseMask | null => {
@@ -219,39 +208,7 @@ export default function CropPreview({
     ctx.moveTo(half, half + gap); ctx.lineTo(half, half + gap + armLen);
     ctx.stroke();
 
-    // Draw guide lines in loupe
-    if (showGuidesRef.current) {
-      const guideLines = guideLinesRef.current;
-      ctx.save();
-      ctx.strokeStyle = "rgba(255, 60, 60, 0.5)";
-      ctx.lineWidth = 2 * dpr;
-      ctx.shadowColor = "rgba(255, 60, 60, 0.3)";
-      ctx.shadowBlur = 2 * dpr;
-      for (const line of guideLines) {
-        if (line.axis === "h") {
-          // Horizontal line: map Y percentage to loupe pixel
-          const lineY = line.pos * info.srcH;
-          const loupeY = ((lineY - (srcY - regionH / 2)) / regionH) * loupePx;
-          if (loupeY >= 0 && loupeY <= loupePx) {
-            ctx.beginPath();
-            ctx.moveTo(0, loupeY);
-            ctx.lineTo(loupePx, loupeY);
-            ctx.stroke();
-          }
-        } else {
-          // Vertical line: map X percentage to loupe pixel
-          const lineX = line.pos * info.srcW;
-          const loupeX = ((lineX - (srcX - regionW / 2)) / regionW) * loupePx;
-          if (loupeX >= 0 && loupeX <= loupePx) {
-            ctx.beginPath();
-            ctx.moveTo(loupeX, 0);
-            ctx.lineTo(loupeX, loupePx);
-            ctx.stroke();
-          }
-        }
-      }
-      ctx.restore();
-    }
+    // TODO: Task 4 will implement Bezier guide line rendering in loupe
 
     // Position loupe near cursor (offset so it doesn't obscure the area)
     const containerRect = containerRef.current?.getBoundingClientRect();
@@ -339,31 +296,7 @@ export default function CropPreview({
     if (!ctx) return;
     drawProgressive(ctx, rotated, canvas.width, canvas.height);
 
-    // Draw guide lines
-    if (state.showGuides) {
-      const lines = selectedImage?.editState?.guideLines ?? [];
-      if (lines.length > 0) {
-        ctx.save();
-        ctx.lineWidth = 2 * dpr;
-        ctx.strokeStyle = "rgba(255, 60, 60, 0.5)";
-        ctx.shadowColor = "rgba(255, 60, 60, 0.3)";
-        ctx.shadowBlur = 3 * dpr;
-        for (const line of lines) {
-          ctx.beginPath();
-          if (line.axis === "h") {
-            const y = Math.round(line.pos * canvas.height);
-            ctx.moveTo(0, y);
-            ctx.lineTo(canvas.width, y);
-          } else {
-            const x = Math.round(line.pos * canvas.width);
-            ctx.moveTo(x, 0);
-            ctx.lineTo(x, canvas.height);
-          }
-          ctx.stroke();
-        }
-        ctx.restore();
-      }
-    }
+    // TODO: Task 4 will implement Bezier guide line rendering on crop preview
   }, [
     selectedImage?.cropCanvas,
     selectedImage?.filteredCanvas,
@@ -571,83 +504,22 @@ export default function CropPreview({
         const hitIdx = getGuideLineAt(e.clientX, e.clientY);
         const container = containerRef.current;
         if (container) {
-          if (hitIdx != null) {
-            const img = state.images.find((i) => i.id === state.selectedImageId);
-            const lines = img?.editState?.guideLines ?? [];
-            container.style.cursor = lines[hitIdx]?.axis === "h" ? "ns-resize" : "ew-resize";
-          } else {
-            container.style.cursor = "";
-          }
+          container.style.cursor = hitIdx != null ? "ns-resize" : "";
         }
       }
 
+      // TODO: Task 5 will implement Bezier guide line dragging
       if (!guideDragRef.current) return;
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      const rect = canvas.getBoundingClientRect();
-      const relX = (e.clientX - rect.left) / rect.width;
-      const relY = (e.clientY - rect.top) / rect.height;
-      const { index } = guideDragRef.current;
-      const img = state.images.find((i) => i.id === state.selectedImageId);
-      if (!img?.editState) return;
-      const lines = [...img.editState.guideLines];
-      const axis = lines[index].axis;
-      lines[index] = { ...lines[index], pos: Math.max(0, Math.min(1, axis === "h" ? relY : relX)) };
-      dispatch({ type: "SET_GUIDE_LINES", id: img.id, guideLines: lines });
     },
-    [state.showGuides, eraserActive, getGuideLineAt, state.images, state.selectedImageId, dispatch],
+    [state.showGuides, eraserActive, getGuideLineAt],
   );
 
   const handleGuidePointerUp = useCallback(
-    (e: React.PointerEvent) => {
-      if (!guideDragRef.current) {
-        // Click-to-place: only if in placement mode, guides active, eraser inactive
-        if (guidePlacementAxis && state.showGuides && !eraserActive) {
-          const canvas = canvasRef.current;
-          if (!canvas) return;
-          const rect = canvas.getBoundingClientRect();
-          const relX = (e.clientX - rect.left) / rect.width;
-          const relY = (e.clientY - rect.top) / rect.height;
-          if (relX < 0 || relX > 1 || relY < 0 || relY > 1) return;
-          // Don't place on an existing line
-          const hitIdx = getGuideLineAt(e.clientX, e.clientY);
-          if (hitIdx != null) return;
-          const img = state.images.find((i) => i.id === state.selectedImageId);
-          if (!img?.editState) return;
-          const lines = [...img.editState.guideLines];
-          const pos = guidePlacementAxis === "h" ? relY : relX;
-          lines.push({ pos, axis: guidePlacementAxis });
-          dispatch({ type: "PUSH_HISTORY", id: img.id });
-          dispatch({ type: "SET_GUIDE_LINES", id: img.id, guideLines: lines });
-          onGuidePlaced?.();
-        }
-        return;
-      }
-
-      // Drag end — remove if dragged outside canvas (history already pushed on drag start)
-      const canvas = canvasRef.current;
-      if (canvas) {
-        const rect = canvas.getBoundingClientRect();
-        const relX = (e.clientX - rect.left) / rect.width;
-        const relY = (e.clientY - rect.top) / rect.height;
-        const { index } = guideDragRef.current;
-        const img = state.images.find((i) => i.id === state.selectedImageId);
-        if (img?.editState) {
-          const lines = [...img.editState.guideLines];
-          const axis = lines[index].axis;
-          const outOfBounds = axis === "h"
-            ? (relY < -0.02 || relY > 1.02)
-            : (relX < -0.02 || relX > 1.02);
-          if (outOfBounds) {
-            // Dragged out — remove this line
-            lines.splice(index, 1);
-            dispatch({ type: "SET_GUIDE_LINES", id: img.id, guideLines: lines });
-          }
-        }
-      }
+    (_e: React.PointerEvent) => {
+      // TODO: Task 5 will implement Bezier guide line placement and drag-end logic
       guideDragRef.current = null;
     },
-    [state.showGuides, eraserActive, guidePlacementAxis, onGuidePlaced, getGuideLineAt, state.images, state.selectedImageId, dispatch],
+    [],
   );
 
   // Pointer handlers — direct DOM manipulation for 60fps loupe tracking

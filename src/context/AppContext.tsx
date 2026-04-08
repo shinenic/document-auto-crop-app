@@ -52,13 +52,18 @@ function cloneEditState(s: EditState): EditState {
       cp2: [...f.cp2] as [number, number],
       isArc: f.isArc,
     })),
+    guideLines: s.guideLines.map((g) => ({
+      leftV: g.leftV,
+      rightV: g.rightV,
+      cp1: [...g.cp1] as [number, number],
+      cp2: [...g.cp2] as [number, number],
+    })),
     rotation: s.rotation,
     filterConfig: {
       type: s.filterConfig.type,
       binarize: { ...s.filterConfig.binarize },
     },
     eraseMask: s.eraseMask ? cloneEraseMask(s.eraseMask) : null,
-    guideLines: s.guideLines.map((g) => ({ ...g })),
   };
 }
 
@@ -70,13 +75,13 @@ export function editStateFromQuad(quad: QuadResult): EditState {
       cp2: [...f.cp2] as [number, number],
       isArc: f.isArc,
     })),
+    guideLines: [],
     rotation: 0,
     filterConfig: {
       type: DEFAULT_FILTER_CONFIG.type,
       binarize: { ...DEFAULT_FILTER_CONFIG.binarize },
     },
     eraseMask: null,
-    guideLines: [],
   };
 }
 

@@ -51,27 +51,30 @@ export interface EraseMask {
   data: Uint8Array; // single-channel: 255 = erased (white), 0 = keep
 }
 
+// --- Guide Lines ---
+
+/** A user-drawn guide line: cubic Bézier from quad L edge to R edge. */
+export interface GuideLine {
+  leftV: number;           // parameter on quad L edge (0=TL, 1=BL)
+  rightV: number;          // parameter on quad R edge (0=TR, 1=BR)
+  cp1: [number, number];   // Bezier control point 1 (mask space)
+  cp2: [number, number];   // Bezier control point 2 (mask space)
+}
+
 // --- Editor State ---
 
 export interface EditState {
   corners: [number, number][];
   edgeFits: EdgeFit[];
+  guideLines: GuideLine[];  // sorted by avg v position
   rotation: 0 | 90 | 180 | 270;
   filterConfig: FilterConfig;
   eraseMask: EraseMask | null;
-  guideLines: GuideLine[];
 }
 
 export interface ImageHistory {
   past: EditState[];
   future: EditState[];
-}
-
-// --- Guide Lines ---
-
-export interface GuideLine {
-  pos: number;    // 0-1 percentage
-  axis: "h" | "v"; // horizontal or vertical
 }
 
 // --- Image Entry ---
