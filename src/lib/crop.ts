@@ -4,11 +4,11 @@
  * perspectiveCrop: Coons patch with arc-length parameterized Bezier boundaries
  * perspectiveHomography: Standard 4-point homography (straight edges only)
  */
-import type { QuadResult } from "./types";
+import type { QuadResult, GuideLine } from "./types";
 
 // ─── Bezier evaluation ──────────────────────────────────────────────────────
 
-function evalBezier(
+export function evalBezier(
   p0: [number, number],
   cp1: [number, number],
   cp2: [number, number],
@@ -63,7 +63,7 @@ function arcLengthToT(table: Float64Array, u: number): number {
   return (lo + frac) / (table.length - 1);
 }
 
-function makeArcLengthEval(
+export function makeArcLengthEval(
   p0: [number, number],
   cp1: [number, number],
   cp2: [number, number],
@@ -72,6 +72,197 @@ function makeArcLengthEval(
   const table = buildArcLengthTable(p0, cp1, cp2, p3);
   return (u: number) =>
     evalBezier(p0, cp1, cp2, p3, arcLengthToT(table, u));
+}
+
+// ─── De Casteljau subdivision ──────────────────────────────────────────────
+
+/** Split a cubic Bezier at parameter t, return left and right sub-curves. */
+function splitBezier(
+  p0: [number, number], cp1: [number, number], cp2: [number, number], p3: [number, number], t: number,
+): { left: [[number, number], [number, number], [number, number], [number, number]]; right: [[number, number], [number, number], [number, number], [number, number]] } {
+  const lerp = (a: [number, number], b: [number, number], s: number): [number, number] =>
+    [a[0] + (b[0] - a[0]) * s, a[1] + (b[1] - a[1]) * s];
+  const a = lerp(p0, cp1, t);
+  const b = lerp(cp1, cp2, t);
+  const c = lerp(cp2, p3, t);
+  const d = lerp(a, b, t);
+  const e = lerp(b, c, t);
+  const f = lerp(d, e, t);
+  return {
+    left: [p0, a, d, f],
+    right: [f, e, c, p3],
+  };
+}
+
+/** Extract Bezier sub-curve from t=tStart to t=tEnd. */
+export function subBezier(
+  p0: [number, number], cp1: [number, number], cp2: [number, number], p3: [number, number],
+  tStart: number, tEnd: number,
+): [[number, number], [number, number], [number, number], [number, number]] {
+  const { right: after } = splitBezier(p0, cp1, cp2, p3, tStart);
+  const tMapped = (tEnd - tStart) / (1 - tStart);
+  const { left } = splitBezier(after[0], after[1], after[2], after[3], tMapped);
+  return left;
+}
+
+// ─── Piecewise Coons patch crop ────────────────────────────────────────────
+
+/**
+ * Piecewise Coons patch: guide lines split the quad into horizontal strips.
+ * Each strip gets an independent Coons patch, producing a horizontal band.
+ * Strips are stacked vertically to form the final output.
+ */
+export function perspectiveCropPiecewise(
+  originalCanvas: HTMLCanvasElement,
+  quadResult: QuadResult,
+  guideLines: GuideLine[],
+  maskWidth: number,
+  maskHeight: number,
+  maxSize?: number,
+): HTMLCanvasElement | null {
+  const { corners, edgeFits } = quadResult;
+  const imgW = originalCanvas.width, imgH = originalCanvas.height;
+  const sX = imgW / maskWidth, sY = imgH / maskHeight;
+
+  const P00 = corners[0], P10 = corners[1], P11 = corners[2], P01 = corners[3];
+
+  // L: TL→BL (edge 3, reversed CPs), R: TR→BR (edge 1)
+  const Lraw: [[number, number], [number, number], [number, number], [number, number]] =
+    [P00, edgeFits[3].cp2, edgeFits[3].cp1, P01];
+  const Rraw: [[number, number], [number, number], [number, number], [number, number]] =
+    [P10, edgeFits[1].cp1, edgeFits[1].cp2, P11];
+
+  const Lfull = makeArcLengthEval(Lraw[0], Lraw[1], Lraw[2], Lraw[3]);
+  const Rfull = makeArcLengthEval(Rraw[0], Rraw[1], Rraw[2], Rraw[3]);
+
+  const sorted = [...guideLines].sort((a, b) => (a.leftV + a.rightV) / 2 - (b.leftV + b.rightV) / 2);
+
+  // V-boundaries
+  const vBounds: number[] = [0];
+  for (const g of sorted) vBounds.push((g.leftV + g.rightV) / 2);
+  vBounds.push(1);
+
+  // Boundary evaluators
+  interface BoundaryEval {
+    eval: (u: number) => [number, number];
+    leftPt: [number, number];
+    rightPt: [number, number];
+  }
+
+  const boundaryEvals: BoundaryEval[] = [];
+
+  // Top edge
+  const topEval = makeArcLengthEval(P00, edgeFits[0].cp1, edgeFits[0].cp2, P10);
+  boundaryEvals.push({ eval: topEval, leftPt: P00, rightPt: P10 });
+
+  // Guide lines
+  for (const g of sorted) {
+    const p0 = Lfull(g.leftV);
+    const p3 = Rfull(g.rightV);
+    const gEval = makeArcLengthEval(p0, g.cp1, g.cp2, p3);
+    boundaryEvals.push({ eval: gEval, leftPt: p0, rightPt: p3 });
+  }
+
+  // Bottom edge (reversed)
+  const botEval = makeArcLengthEval(P01, edgeFits[2].cp2, edgeFits[2].cp1, P11);
+  boundaryEvals.push({ eval: botEval, leftPt: P01, rightPt: P11 });
+
+  // Output dimensions
+  const imgCorners: [number, number][] = corners.map((c) => [c[0] * sX, c[1] * sY]);
+  const dims = computeCropDimensions(imgCorners, imgW, imgH);
+  if (!dims) return null;
+  let outW = dims.outW;
+  let outH = dims.outH;
+
+  if (maxSize && (outW > maxSize || outH > maxSize)) {
+    const scale = maxSize / Math.max(outW, outH);
+    outW = Math.round(outW * scale);
+    outH = Math.round(outH * scale);
+  }
+  if (outW < 2 || outH < 2) return null;
+
+  const srcData = originalCanvas.getContext("2d")!.getImageData(0, 0, imgW, imgH);
+  const outCanvas = document.createElement("canvas");
+  outCanvas.width = outW;
+  outCanvas.height = outH;
+  const outCtx = outCanvas.getContext("2d")!;
+  const outData = outCtx.createImageData(outW, outH);
+
+  const numStrips = vBounds.length - 1;
+  let yOffset = 0;
+
+  for (let si = 0; si < numStrips; si++) {
+    const vTop = vBounds[si];
+    const vBot = vBounds[si + 1];
+    const vSpan = vBot - vTop;
+
+    const stripH = si < numStrips - 1
+      ? Math.round(outH * vSpan)
+      : outH - yOffset;
+
+    if (stripH < 1) continue;
+
+    const topB = boundaryEvals[si];
+    const botB = boundaryEvals[si + 1];
+
+    const lSub = subBezier(Lraw[0], Lraw[1], Lraw[2], Lraw[3], vTop, vBot);
+    const leftEval = makeArcLengthEval(lSub[0], lSub[1], lSub[2], lSub[3]);
+
+    const rSub = subBezier(Rraw[0], Rraw[1], Rraw[2], Rraw[3], vTop, vBot);
+    const rightEval = makeArcLengthEval(rSub[0], rSub[1], rSub[2], rSub[3]);
+
+    const sP00 = topB.leftPt, sP10 = topB.rightPt;
+    const sP01 = botB.leftPt, sP11 = botB.rightPt;
+
+    const topPts = new Float64Array(outW * 2);
+    const botPts = new Float64Array(outW * 2);
+    for (let px = 0; px < outW; px++) {
+      const u = px / (outW - 1);
+      const t = topB.eval(u), b = botB.eval(u);
+      topPts[px * 2] = t[0]; topPts[px * 2 + 1] = t[1];
+      botPts[px * 2] = b[0]; botPts[px * 2 + 1] = b[1];
+    }
+
+    for (let py = 0; py < stripH; py++) {
+      const v = stripH > 1 ? py / (stripH - 1) : 0.5;
+      const lv = leftEval(v), rv = rightEval(v);
+      const omv = 1 - v;
+
+      for (let px = 0; px < outW; px++) {
+        const u = px / (outW - 1);
+        const omu = 1 - u;
+        const tu0 = topPts[px * 2], tu1 = topPts[px * 2 + 1];
+        const bu0 = botPts[px * 2], bu1 = botPts[px * 2 + 1];
+
+        const mx = omv * tu0 + v * bu0 + omu * lv[0] + u * rv[0]
+          - omu * omv * sP00[0] - u * omv * sP10[0] - omu * v * sP01[0] - u * v * sP11[0];
+        const my = omv * tu1 + v * bu1 + omu * lv[1] + u * rv[1]
+          - omu * omv * sP00[1] - u * omv * sP10[1] - omu * v * sP01[1] - u * v * sP11[1];
+
+        const srcX = mx * sX, srcY = my * sY;
+        if (srcX < 0 || srcX >= imgW - 1 || srcY < 0 || srcY >= imgH - 1) continue;
+
+        const ix = Math.floor(srcX), iy = Math.floor(srcY);
+        const fx = srcX - ix, fy = srcY - iy;
+        const outIdx = ((yOffset + py) * outW + px) * 4;
+        for (let c = 0; c < 3; c++) {
+          const v00 = srcData.data[(iy * imgW + ix) * 4 + c];
+          const v10 = srcData.data[(iy * imgW + ix + 1) * 4 + c];
+          const v01 = srcData.data[((iy + 1) * imgW + ix) * 4 + c];
+          const v11 = srcData.data[((iy + 1) * imgW + ix + 1) * 4 + c];
+          outData.data[outIdx + c] = Math.round(
+            v00 * (1 - fx) * (1 - fy) + v10 * fx * (1 - fy) + v01 * (1 - fx) * fy + v11 * fx * fy,
+          );
+        }
+        outData.data[outIdx + 3] = 255;
+      }
+    }
+
+    yOffset += stripH;
+  }
+
+  outCtx.putImageData(outData, 0, 0);
+  return outCanvas;
 }
 
 // ─── Coons patch crop ───────────────────────────────────────────────────────
