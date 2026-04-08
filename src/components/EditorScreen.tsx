@@ -474,8 +474,9 @@ export default function EditorScreen() {
                         : "bg-[var(--bg-tertiary)] text-[var(--text-muted)] hover:text-[var(--text-secondary)] border-[var(--border)]"
                     }`}
                     onClick={() => setGuidePlacementAxis(guidePlacementAxis === "h" ? null : "h")}
+                    title="Click to place a horizontal guide line"
                   >
-                    + H
+                    + Horizontal <kbd className="ml-1 text-[8px] font-mono opacity-50">H</kbd>
                   </button>
                   <button
                     className={`px-1.5 py-0.5 text-[9px] rounded border transition-colors ${
@@ -484,15 +485,22 @@ export default function EditorScreen() {
                         : "bg-[var(--bg-tertiary)] text-[var(--text-muted)] hover:text-[var(--text-secondary)] border-[var(--border)]"
                     }`}
                     onClick={() => setGuidePlacementAxis(guidePlacementAxis === "v" ? null : "v")}
+                    title="Click to place a vertical guide line"
                   >
-                    + V
+                    + Vertical <kbd className="ml-1 text-[8px] font-mono opacity-50">V</kbd>
                   </button>
-                  <span className="text-[9px] font-mono text-[var(--accent)]">
-                    {selectedImage?.editState?.guideLines?.length ?? 0}
+                  <span className="text-[9px] font-mono text-[var(--accent)] min-w-[1ch] text-center">
+                    {getSelectedImage(state)?.editState?.guideLines?.length ?? 0}
                   </span>
                   <button
                     className="px-1.5 py-0.5 text-[9px] rounded text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors"
-                    onClick={() => { if (selectedImage) dispatch({ type: "SET_GUIDE_LINES", id: selectedImage.id, guideLines: [] }); }}
+                    onClick={() => {
+                      const img = getSelectedImage(state);
+                      if (!img?.editState) return;
+                      dispatch({ type: "PUSH_HISTORY", id: img.id });
+                      dispatch({ type: "SET_GUIDE_LINES", id: img.id, guideLines: [] });
+                    }}
+                    title="Clear all guide lines"
                   >
                     Clear
                   </button>
@@ -542,7 +550,7 @@ export default function EditorScreen() {
               { group: "Navigation", keys: [["Arrow Up / Down", "Previous / Next image"]] },
               { group: "Editing", keys: [["Ctrl+Z", "Undo"], ["Ctrl+Shift+Z", "Redo"], ["R", "Rotate 90° CW"], ["Shift+R", "Rotate 90° CCW"]] },
               { group: "Eraser", keys: [["E", "Toggle eraser mode"], ["B", "Brush tool"], ["L", "Lasso tool"], ["[ / ]", "Brush size -/+"]] },
-              { group: "Guides", keys: [["Del / Backspace", "Delete selected guide"]] },
+              { group: "Guides", keys: [["G", "Toggle guide lines"], ["H", "Place horizontal line"], ["V", "Place vertical line"], ["Right-click", "Remove line"]] },
             ].map(({ group, keys }) => (
               <div key={group} className="mb-3 last:mb-0">
                 <h4 className="text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">{group}</h4>
