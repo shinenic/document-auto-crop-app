@@ -8,7 +8,7 @@ import QuadEditor from "./QuadEditor";
 import CropPreview from "./CropPreview";
 import ToolPanel from "./ToolPanel";
 import { useApp } from "../context/AppContext";
-import { perspectiveCrop } from "../lib/crop";
+import { perspectiveCrop, perspectiveCropPiecewise } from "../lib/crop";
 import { applyBinarize } from "../lib/binarize";
 import type { AppState } from "../lib/types";
 import { useKeyboardShortcuts } from "../hooks/useKeyboardShortcuts";
@@ -134,6 +134,7 @@ export default function EditorScreen() {
     ? JSON.stringify({
         corners: selectedImage.editState.corners,
         edgeFits: selectedImage.editState.edgeFits,
+        guideLines: selectedImage.editState.guideLines,
       })
     : null;
 
@@ -152,12 +153,21 @@ export default function EditorScreen() {
       edgeFits: selectedImage.editState.edgeFits,
     };
 
-    const cropCanvas = perspectiveCrop(
-      selectedImage.originalCanvas,
-      quadResult,
-      selectedImage.maskWidth,
-      selectedImage.maskHeight,
-    );
+    const gl = selectedImage.editState.guideLines;
+    const cropCanvas = gl.length > 0
+      ? perspectiveCropPiecewise(
+          selectedImage.originalCanvas,
+          quadResult,
+          gl,
+          selectedImage.maskWidth,
+          selectedImage.maskHeight,
+        )
+      : perspectiveCrop(
+          selectedImage.originalCanvas,
+          quadResult,
+          selectedImage.maskWidth,
+          selectedImage.maskHeight,
+        );
 
     dispatch({
       type: "UPDATE_IMAGE",
@@ -282,17 +292,27 @@ export default function EditorScreen() {
       edgeFits: img.editState.edgeFits,
     };
 
-    const cropCanvas = perspectiveCrop(
-      img.originalCanvas,
-      quadResult,
-      img.maskWidth,
-      img.maskHeight,
-    );
+    const gl = img.editState.guideLines;
+    const cropCanvas = gl.length > 0
+      ? perspectiveCropPiecewise(
+          img.originalCanvas,
+          quadResult,
+          gl,
+          img.maskWidth,
+          img.maskHeight,
+        )
+      : perspectiveCrop(
+          img.originalCanvas,
+          quadResult,
+          img.maskWidth,
+          img.maskHeight,
+        );
 
     // Update prevCropKey so the useEffect doesn't double-compute
     prevCropKeyRef.current = JSON.stringify({
       corners: img.editState.corners,
       edgeFits: img.editState.edgeFits,
+      guideLines: img.editState.guideLines,
     });
 
     dispatch({
