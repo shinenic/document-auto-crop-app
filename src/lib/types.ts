@@ -53,19 +53,18 @@ export interface EraseMask {
 
 // --- Guide Lines ---
 
-/** A user-drawn guide line: cubic Bézier with endpoints freely placed inside the quad.
- *  The system extrapolates to quad L/R edges for piecewise Coons patch boundaries. */
 export interface GuideLine {
-  p0: [number, number];    // left endpoint (mask space, NOT necessarily on quad edge)
-  p3: [number, number];    // right endpoint (mask space, NOT necessarily on quad edge)
-  cp1: [number, number];   // Bezier control point 1 (mask space)
-  cp2: [number, number];   // Bezier control point 2 (mask space)
+  pos: number;    // 0-1 percentage
+  axis: "h" | "v"; // horizontal or vertical
 }
 
-/** A simple reference line for visual alignment (does NOT affect crop). */
-export interface ReferenceLine {
-  pos: number;        // position as percentage (0-1) along the relevant axis
-  axis: "h" | "v";   // horizontal or vertical
+/** A user-drawn dewarp guide: cubic Bézier with endpoints freely placed inside the quad.
+ *  The system extrapolates to quad L/R edges for piecewise Coons patch boundaries. */
+export interface DewarpGuide {
+  p0: [number, number];    // left endpoint (mask space)
+  p3: [number, number];    // right endpoint (mask space)
+  cp1: [number, number];   // Bezier control point 1 (mask space)
+  cp2: [number, number];   // Bezier control point 2 (mask space)
 }
 
 // --- Editor State ---
@@ -73,10 +72,11 @@ export interface ReferenceLine {
 export interface EditState {
   corners: [number, number][];
   edgeFits: EdgeFit[];
-  guideLines: GuideLine[];  // sorted by avg v position
   rotation: 0 | 90 | 180 | 270;
   filterConfig: FilterConfig;
   eraseMask: EraseMask | null;
+  guideLines: GuideLine[];        // reference lines (original)
+  dewarpGuides: DewarpGuide[];    // staff line dewarping curves
 }
 
 export interface ImageHistory {
@@ -117,7 +117,6 @@ export interface AppState {
   modelLoading: boolean;
   showMask: boolean;
   showGuides: boolean;
-  refLines: ReferenceLine[];
 }
 
 // --- Selection ---

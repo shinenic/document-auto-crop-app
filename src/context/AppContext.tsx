@@ -14,7 +14,6 @@ import type {
   GuideLine,
   ImageEntry,
   QuadResult,
-  ReferenceLine,
 } from "../lib/types";
 import { DEFAULT_FILTER_CONFIG } from "../lib/types";
 import { cloneEraseMask } from "../lib/eraser";
@@ -41,8 +40,7 @@ export type AppAction =
   | { type: "TOGGLE_MASK" }
   | { type: "TOGGLE_GUIDES" }
   | { type: "SET_GUIDE_LINES"; id: string; guideLines: GuideLine[] }
-  | { type: "SET_REF_LINES"; lines: ReferenceLine[] }
-  | { type: "LOAD_DRAFT"; images: ImageEntry[]; showMask: boolean; showGuides: boolean; refLines?: ReferenceLine[] };
+  | { type: "LOAD_DRAFT"; images: ImageEntry[]; showMask: boolean; showGuides: boolean };
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -54,18 +52,19 @@ function cloneEditState(s: EditState): EditState {
       cp2: [...f.cp2] as [number, number],
       isArc: f.isArc,
     })),
-    guideLines: s.guideLines.map((g) => ({
-      p0: [...g.p0] as [number, number],
-      p3: [...g.p3] as [number, number],
-      cp1: [...g.cp1] as [number, number],
-      cp2: [...g.cp2] as [number, number],
-    })),
     rotation: s.rotation,
     filterConfig: {
       type: s.filterConfig.type,
       binarize: { ...s.filterConfig.binarize },
     },
     eraseMask: s.eraseMask ? cloneEraseMask(s.eraseMask) : null,
+    guideLines: s.guideLines.map((g) => ({ pos: g.pos, axis: g.axis })),
+    dewarpGuides: s.dewarpGuides.map((g) => ({
+      p0: [...g.p0] as [number, number],
+      p3: [...g.p3] as [number, number],
+      cp1: [...g.cp1] as [number, number],
+      cp2: [...g.cp2] as [number, number],
+    })),
   };
 }
 
@@ -77,13 +76,14 @@ export function editStateFromQuad(quad: QuadResult): EditState {
       cp2: [...f.cp2] as [number, number],
       isArc: f.isArc,
     })),
-    guideLines: [],
     rotation: 0,
     filterConfig: {
       type: DEFAULT_FILTER_CONFIG.type,
       binarize: { ...DEFAULT_FILTER_CONFIG.binarize },
     },
     eraseMask: null,
+    guideLines: [],
+    dewarpGuides: [],
   };
 }
 
@@ -298,9 +298,6 @@ function reducer(state: AppState, action: AppAction): AppState {
       };
     }
 
-    case "SET_REF_LINES":
-      return { ...state, refLines: action.lines };
-
     case "LOAD_DRAFT":
       return {
         ...state,
@@ -309,7 +306,6 @@ function reducer(state: AppState, action: AppAction): AppState {
         selectedImageId: action.images[0]?.id ?? null,
         showMask: action.showMask,
         showGuides: action.showGuides,
-        refLines: action.refLines ?? [],
       };
 
     default:
@@ -327,7 +323,6 @@ const initialState: AppState = {
   modelLoading: false,
   showMask: true,
   showGuides: false,
-  refLines: [],
 };
 
 const AppContext = createContext<{

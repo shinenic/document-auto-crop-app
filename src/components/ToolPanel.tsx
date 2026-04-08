@@ -349,11 +349,11 @@ export default function ToolPanel({
             disabled={!hasCrop}
             active={guideAddMode}
           />
-          {(sel?.editState?.guideLines?.length ?? 0) > 0 && (
+          {(sel?.editState?.dewarpGuides?.length ?? 0) > 0 && (
             <>
               <div className="flex items-center justify-between px-1">
                 <span className="text-[10px] text-[var(--text-muted)]">
-                  {sel?.editState?.guideLines?.length ?? 0} dewarp guide{(sel?.editState?.guideLines?.length ?? 0) !== 1 ? "s" : ""}
+                  {sel?.editState?.dewarpGuides?.length ?? 0} dewarp guide{(sel?.editState?.dewarpGuides?.length ?? 0) !== 1 ? "s" : ""}
                 </span>
                 <button
                   className="text-[10px] text-[var(--text-muted)] hover:text-[var(--danger)] transition-colors"

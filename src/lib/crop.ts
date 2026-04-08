@@ -4,7 +4,7 @@
  * perspectiveCrop: Coons patch with arc-length parameterized Bezier boundaries
  * perspectiveHomography: Standard 4-point homography (straight edges only)
  */
-import type { QuadResult, GuideLine } from "./types";
+import type { QuadResult, DewarpGuide } from "./types";
 
 // ─── Bezier evaluation ──────────────────────────────────────────────────────
 
@@ -179,7 +179,7 @@ function makeCompositeArcLengthEval(
  * - leftPt, rightPt: actual intersection points on L/R edges
  */
 function extrapolateGuide(
-  g: GuideLine,
+  g: DewarpGuide,
   Lraw: BezierPts,
   Rraw: BezierPts,
 ): { leftV: number; rightV: number; eval: (u: number) => Pt; leftPt: Pt; rightPt: Pt } {
@@ -237,7 +237,7 @@ function extrapolateGuide(
 export function perspectiveCropPiecewise(
   originalCanvas: HTMLCanvasElement,
   quadResult: QuadResult,
-  guideLines: GuideLine[],
+  dewarpGuides: DewarpGuide[],
   maskWidth: number,
   maskHeight: number,
   maxSize?: number,
@@ -252,8 +252,8 @@ export function perspectiveCropPiecewise(
   const Lraw: BezierPts = [P00, edgeFits[3].cp2, edgeFits[3].cp1, P01];
   const Rraw: BezierPts = [P10, edgeFits[1].cp1, edgeFits[1].cp2, P11];
 
-  // Extrapolate each guide line to the edges
-  const extrapolated = guideLines.map(g => extrapolateGuide(g, Lraw, Rraw));
+  // Extrapolate each dewarp guide to the edges
+  const extrapolated = dewarpGuides.map(g => extrapolateGuide(g, Lraw, Rraw));
 
   // Sort by average v position
   const sorted = [...extrapolated].sort((a, b) => (a.leftV + a.rightV) / 2 - (b.leftV + b.rightV) / 2);

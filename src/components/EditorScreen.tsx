@@ -10,7 +10,7 @@ import ToolPanel from "./ToolPanel";
 import { useApp } from "../context/AppContext";
 import { perspectiveCrop, perspectiveCropPiecewise } from "../lib/crop";
 import { applyBinarize } from "../lib/binarize";
-import type { AppState, GuideLine } from "../lib/types";
+import type { AppState, DewarpGuide } from "../lib/types";
 import { useKeyboardShortcuts } from "../hooks/useKeyboardShortcuts";
 
 function getSelectedImage(state: AppState) {
@@ -143,7 +143,7 @@ export default function EditorScreen() {
     ? JSON.stringify({
         corners: selectedImage.editState.corners,
         edgeFits: selectedImage.editState.edgeFits,
-        guideLines: selectedImage.editState.guideLines,
+        dewarpGuides: selectedImage.editState.dewarpGuides,
       })
     : null;
 
@@ -162,12 +162,12 @@ export default function EditorScreen() {
       edgeFits: selectedImage.editState.edgeFits,
     };
 
-    const gl = selectedImage.editState.guideLines;
-    const cropCanvas = gl.length > 0
+    const dg = selectedImage.editState.dewarpGuides;
+    const cropCanvas = dg.length > 0
       ? perspectiveCropPiecewise(
           selectedImage.originalCanvas,
           quadResult,
-          gl,
+          dg,
           selectedImage.maskWidth,
           selectedImage.maskHeight,
         )
@@ -301,12 +301,12 @@ export default function EditorScreen() {
       edgeFits: img.editState.edgeFits,
     };
 
-    const gl = img.editState.guideLines;
-    const cropCanvas = gl.length > 0
+    const dg = img.editState.dewarpGuides;
+    const cropCanvas = dg.length > 0
       ? perspectiveCropPiecewise(
           img.originalCanvas,
           quadResult,
-          gl,
+          dg,
           img.maskWidth,
           img.maskHeight,
         )
@@ -321,7 +321,7 @@ export default function EditorScreen() {
     prevCropKeyRef.current = JSON.stringify({
       corners: img.editState.corners,
       edgeFits: img.editState.edgeFits,
-      guideLines: img.editState.guideLines,
+      dewarpGuides: img.editState.dewarpGuides,
     });
 
     dispatch({
@@ -342,11 +342,11 @@ export default function EditorScreen() {
       setPendingP0([mx, my]);
       setGuideAddStep("right");
     } else if (guideAddStep === "right" && pendingP0) {
-      // Second click: place right endpoint (p3) and create guide line
+      // Second click: place right endpoint (p3) and create dewarp guide
       const p0 = pendingP0;
       const p3: [number, number] = [mx, my];
 
-      const newGuide: GuideLine = {
+      const newGuide: DewarpGuide = {
         p0,
         p3,
         cp1: [p0[0] + (p3[0] - p0[0]) / 3, p0[1] + (p3[1] - p0[1]) / 3],
@@ -354,10 +354,10 @@ export default function EditorScreen() {
       };
 
       dispatch({ type: "PUSH_HISTORY", id: img.id });
-      const guideLines = [...es.guideLines, newGuide].sort(
+      const dewarpGuides = [...es.dewarpGuides, newGuide].sort(
         (a, b) => (a.p0[1] + a.p3[1]) / 2 - (b.p0[1] + b.p3[1]) / 2,
       );
-      dispatch({ type: "SET_EDIT_STATE", id: img.id, editState: { ...es, guideLines } });
+      dispatch({ type: "SET_EDIT_STATE", id: img.id, editState: { ...es, dewarpGuides } });
 
       setGuideAddStep(null);
       setPendingP0(null);
@@ -368,9 +368,9 @@ export default function EditorScreen() {
 
   const handleClearGuides = useCallback(() => {
     const img = getSelectedImage(stateRef.current);
-    if (!img?.editState || img.editState.guideLines.length === 0) return;
+    if (!img?.editState || img.editState.dewarpGuides.length === 0) return;
     dispatch({ type: "PUSH_HISTORY", id: img.id });
-    dispatch({ type: "SET_EDIT_STATE", id: img.id, editState: { ...img.editState, guideLines: [] } });
+    dispatch({ type: "SET_EDIT_STATE", id: img.id, editState: { ...img.editState, dewarpGuides: [] } });
   }, [dispatch]);
 
   const handleResizePointerDown = useCallback((e: React.PointerEvent) => {
@@ -488,11 +488,11 @@ export default function EditorScreen() {
                     + V
                   </button>
                   <span className="text-[9px] font-mono text-[var(--accent)]">
-                    {state.refLines.length}
+                    {selectedImage?.editState?.guideLines?.length ?? 0}
                   </span>
                   <button
                     className="px-1.5 py-0.5 text-[9px] rounded text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors"
-                    onClick={() => dispatch({ type: "SET_REF_LINES", lines: [] })}
+                    onClick={() => { if (selectedImage) dispatch({ type: "SET_GUIDE_LINES", id: selectedImage.id, guideLines: [] }); }}
                   >
                     Clear
                   </button>

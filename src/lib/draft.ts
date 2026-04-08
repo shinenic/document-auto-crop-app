@@ -18,7 +18,8 @@ export interface ManifestImage {
 interface ManifestEditState {
   corners: [number, number][];
   edgeFits: EdgeFit[];
-  guideLines?: { p0: [number, number]; p3: [number, number]; cp1: [number, number]; cp2: [number, number] }[];
+  guideLines?: { pos: number; axis: "h" | "v" }[];
+  dewarpGuides?: { p0: [number, number]; p3: [number, number]; cp1: [number, number]; cp2: [number, number] }[];
   rotation: 0 | 90 | 180 | 270;
   filterConfig: { type: "none" | "binarize"; binarize: { blockRadiusBps: number; contrastOffset: number; upsamplingScale: number } };
   eraseMaskFile: string | null;
@@ -29,14 +30,12 @@ interface Manifest {
   savedAt: string;
   showMask: boolean;
   showGuides: boolean;
-  refLines?: { pos: number; axis: "h" | "v" }[];
   images: ManifestImage[];
 }
 
 export interface DraftData {
   showMask: boolean;
   showGuides: boolean;
-  refLines: { pos: number; axis: "h" | "v" }[];
   images: ImageEntry[];
 }
 
@@ -53,7 +52,8 @@ function editStateToManifest(es: EditState, eraseMaskFile: string | null): Manif
   return {
     corners: es.corners.map(c => [...c] as [number, number]),
     edgeFits: es.edgeFits.map(f => ({ cp1: [...f.cp1] as [number, number], cp2: [...f.cp2] as [number, number], isArc: f.isArc })),
-    guideLines: es.guideLines.map(g => ({ p0: [...g.p0] as [number, number], p3: [...g.p3] as [number, number], cp1: [...g.cp1] as [number, number], cp2: [...g.cp2] as [number, number] })),
+    guideLines: es.guideLines.map(g => ({ pos: g.pos, axis: g.axis })),
+    dewarpGuides: es.dewarpGuides.map(g => ({ p0: [...g.p0] as [number, number], p3: [...g.p3] as [number, number], cp1: [...g.cp1] as [number, number], cp2: [...g.cp2] as [number, number] })),
     rotation: es.rotation,
     filterConfig: { type: es.filterConfig.type, binarize: { ...es.filterConfig.binarize } },
     eraseMaskFile,
@@ -64,10 +64,11 @@ function manifestToEditState(m: ManifestEditState, eraseMask: EraseMask | null):
   return {
     corners: m.corners.map(c => [...c] as [number, number]),
     edgeFits: m.edgeFits.map(f => ({ cp1: [...f.cp1] as [number, number], cp2: [...f.cp2] as [number, number], isArc: f.isArc })),
-    guideLines: (m.guideLines ?? []).map(g => ({ p0: [...g.p0] as [number, number], p3: [...g.p3] as [number, number], cp1: [...g.cp1] as [number, number], cp2: [...g.cp2] as [number, number] })),
     rotation: m.rotation,
     filterConfig: { type: m.filterConfig.type, binarize: { ...m.filterConfig.binarize } },
     eraseMask,
+    guideLines: (m.guideLines ?? []).map(g => ({ pos: g.pos, axis: g.axis })),
+    dewarpGuides: (m.dewarpGuides ?? []).map(g => ({ p0: [...g.p0] as [number, number], p3: [...g.p3] as [number, number], cp1: [...g.cp1] as [number, number], cp2: [...g.cp2] as [number, number] })),
   };
 }
 
@@ -145,7 +146,6 @@ export async function saveDraft(
   showMask: boolean,
   dirtyIds: Set<string> | null, // null = save all (first save)
   showGuides: boolean = false,
-  refLines: { pos: number; axis: "h" | "v" }[] = [],
 ): Promise<void> {
   const manifestImages: ManifestImage[] = [];
   const usedFileNames = new Set<string>();
@@ -206,7 +206,6 @@ export async function saveDraft(
     savedAt: new Date().toISOString(),
     showMask,
     showGuides,
-    refLines,
     images: manifestImages,
   };
   const manifestBlob = new Blob([JSON.stringify(manifest, null, 2)], { type: "application/json" });
@@ -325,7 +324,6 @@ export async function loadDraft(dirHandle: FileSystemDirectoryHandle): Promise<D
   return {
     showMask: manifest.showMask,
     showGuides: manifest.showGuides ?? false,
-    refLines: manifest.refLines ?? [],
     images,
   };
 }

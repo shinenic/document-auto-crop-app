@@ -282,16 +282,16 @@ export default function QuadEditor({ onDragStart, onDragEnd, guideAddMode, onGui
       ctx.stroke();
     }
 
-    // Draw guide lines
-    const { guideLines } = editState;
+    // Draw dewarp guides
+    const { dewarpGuides } = editState;
     const glLw = Math.max(2, Math.round(imgW / 300));
     const glR = Math.max(5, Math.round(imgW / 90));
     const glRSel = Math.max(8, Math.round(imgW / 60));
     const glCpR = Math.max(4, Math.round(imgW / 100));
     const glCpRSel = Math.max(7, Math.round(imgW / 70));
 
-    for (let gi = 0; gi < guideLines.length; gi++) {
-      const g = guideLines[gi];
+    for (let gi = 0; gi < dewarpGuides.length; gi++) {
+      const g = dewarpGuides[gi];
 
       // Draw extension lines (dashed) from L/R edges to p0/p3
       // Project endpoints onto L/R edges to find where extensions meet
@@ -388,8 +388,8 @@ export default function QuadEditor({ onDragStart, onDragEnd, guideAddMode, onGui
         e.preventDefault();
         const gi = selected.edgeIdx;
         dispatch({ type: "PUSH_HISTORY", id: selectedImage.id });
-        const guideLines = editState.guideLines.filter((_, i) => i !== gi);
-        dispatch({ type: "SET_EDIT_STATE", id: selectedImage.id, editState: { ...editState, guideLines } });
+        const dewarpGuides = editState.dewarpGuides.filter((_, i) => i !== gi);
+        dispatch({ type: "SET_EDIT_STATE", id: selectedImage.id, editState: { ...editState, dewarpGuides } });
         setSelected(null);
       }
     };
@@ -416,9 +416,9 @@ export default function QuadEditor({ onDragStart, onDragEnd, guideAddMode, onGui
       const e = editState.corners[(i + 1) % 4];
       pts.push({ type: "edge", edgeIdx: i, pos: [(s[0] + e[0]) / 2, (s[1] + e[1]) / 2] });
     }
-    // Guide line hit targets — endpoints are at p0/p3 (freely placed)
-    for (let gi = 0; gi < editState.guideLines.length; gi++) {
-      const g = editState.guideLines[gi];
+    // Dewarp guide hit targets — endpoints are at p0/p3 (freely placed)
+    for (let gi = 0; gi < editState.dewarpGuides.length; gi++) {
+      const g = editState.dewarpGuides[gi];
       pts.push({ type: "guide-left", edgeIdx: gi, pos: g.p0 });
       pts.push({ type: "guide-right", edgeIdx: gi, pos: g.p3 });
       pts.push({ type: "guide-cp1", edgeIdx: gi, pos: g.cp1 });
@@ -601,37 +601,37 @@ export default function QuadEditor({ onDragStart, onDragEnd, guideAddMode, onGui
           editState: { ...editState, edgeFits },
         });
       } else if (type === "guide-body") {
-        // Move entire guide line by delta (translate all 4 points)
+        // Move entire dewarp guide by delta (translate all 4 points)
         const gi = edgeIdx;
-        const g = editState.guideLines[gi];
+        const g = editState.dewarpGuides[gi];
         const midY = (g.p0[1] + g.p3[1]) / 2;
         const dy = my - midY;
         const dx = mx - (g.p0[0] + g.p3[0]) / 2;
-        const guideLines = editState.guideLines.map((gl, i) => i === gi ? {
+        const dewarpGuides = editState.dewarpGuides.map((dg, i) => i === gi ? {
           p0: [g.p0[0] + dx, g.p0[1] + dy] as [number, number],
           p3: [g.p3[0] + dx, g.p3[1] + dy] as [number, number],
           cp1: [g.cp1[0] + dx, g.cp1[1] + dy] as [number, number],
           cp2: [g.cp2[0] + dx, g.cp2[1] + dy] as [number, number],
-        } : { ...gl });
-        dispatch({ type: "SET_EDIT_STATE", id: selectedImage.id, editState: { ...editState, guideLines } });
+        } : { ...dg });
+        dispatch({ type: "SET_EDIT_STATE", id: selectedImage.id, editState: { ...editState, dewarpGuides } });
       } else if (type === "guide-left" || type === "guide-right") {
         // Freely drag endpoint (not constrained to edge)
         const gi = edgeIdx;
-        const g = editState.guideLines[gi];
+        const g = editState.dewarpGuides[gi];
         const clamped = clampToContainer(mx, my);
-        const guideLines = editState.guideLines.map((gl, i) => {
-          if (i !== gi) return { ...gl };
-          return type === "guide-left" ? { ...gl, p0: clamped } : { ...gl, p3: clamped };
+        const dewarpGuides = editState.dewarpGuides.map((dg, i) => {
+          if (i !== gi) return { ...dg };
+          return type === "guide-left" ? { ...dg, p0: clamped } : { ...dg, p3: clamped };
         });
-        dispatch({ type: "SET_EDIT_STATE", id: selectedImage.id, editState: { ...editState, guideLines } });
+        dispatch({ type: "SET_EDIT_STATE", id: selectedImage.id, editState: { ...editState, dewarpGuides } });
       } else if (type === "guide-cp1" || type === "guide-cp2") {
         const gi = edgeIdx;
         const cpKey = type === "guide-cp1" ? "cp1" : "cp2";
-        const guideLines = editState.guideLines.map((gl, i) => {
-          if (i !== gi) return { ...gl };
-          return { ...gl, [cpKey]: clampToContainer(mx, my) };
+        const dewarpGuides = editState.dewarpGuides.map((dg, i) => {
+          if (i !== gi) return { ...dg };
+          return { ...dg, [cpKey]: clampToContainer(mx, my) };
         });
-        dispatch({ type: "SET_EDIT_STATE", id: selectedImage.id, editState: { ...editState, guideLines } });
+        dispatch({ type: "SET_EDIT_STATE", id: selectedImage.id, editState: { ...editState, dewarpGuides } });
       }
     },
     [dragging, selected, editState, selectedImage, toMaskFromPointer, dispatch, onDragStart, maskToCanvas, clampToImage, clampToContainer],

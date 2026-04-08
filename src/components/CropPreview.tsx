@@ -65,7 +65,8 @@ export default function CropPreview({
 
   // Sync guide line refs for loupe rendering
   useEffect(() => {
-    guideLinesRef.current = state.refLines;
+    const sel = state.images.find((img) => img.id === state.selectedImageId);
+    guideLinesRef.current = sel?.editState?.guideLines ?? [];
     showGuidesRef.current = state.showGuides;
   });
 
@@ -101,7 +102,7 @@ export default function CropPreview({
       const rect = canvas.getBoundingClientRect();
       const relX = (clientX - rect.left) / rect.width;
       const relY = (clientY - rect.top) / rect.height;
-      const lines = state.refLines;
+      const lines = selectedImage?.editState?.guideLines ?? [];
       const hitThreshold = 8 / Math.max(rect.width, rect.height);
       for (let i = 0; i < lines.length; i++) {
         if (lines[i].axis === "h" && Math.abs(lines[i].pos - relY) < hitThreshold) return i;
@@ -109,7 +110,7 @@ export default function CropPreview({
       }
       return null;
     },
-    [state.refLines],
+    [selectedImage?.editState?.guideLines],
   );
 
   const getOrCreateMask = useCallback((): import("../lib/types").EraseMask | null => {
@@ -341,7 +342,7 @@ export default function CropPreview({
 
     // Draw reference guide lines
     if (state.showGuides) {
-      const lines = state.refLines;
+      const lines = selectedImage?.editState?.guideLines ?? [];
       if (lines.length > 0) {
         ctx.save();
         const dpr = window.devicePixelRatio || 1;
@@ -371,9 +372,9 @@ export default function CropPreview({
     selectedImage?.editState?.rotation,
     selectedImage?.editState?.filterConfig?.type,
     selectedImage?.editState?.eraseMask,
+    selectedImage?.editState?.guideLines,
     selectedImage?.originalCanvas,
     state.showGuides,
-    state.refLines,
   ]);
 
   useEffect(() => {
@@ -556,7 +557,7 @@ export default function CropPreview({
   // Guide placement click handler
   const handleGuidePlacementDown = useCallback(
     (e: React.PointerEvent) => {
-      if (!guidePlacementAxis || eraserActive) return false;
+      if (!guidePlacementAxis || eraserActive || !selectedImage?.id) return false;
       const canvas = canvasRef.current;
       if (!canvas) return false;
       const rect = canvas.getBoundingClientRect();
@@ -564,12 +565,13 @@ export default function CropPreview({
         ? (e.clientY - rect.top) / rect.height
         : (e.clientX - rect.left) / rect.width;
       if (pos >= 0 && pos <= 1) {
-        dispatch({ type: "SET_REF_LINES", lines: [...state.refLines, { pos, axis: guidePlacementAxis }] });
+        const currentLines = selectedImage?.editState?.guideLines ?? [];
+        dispatch({ type: "SET_GUIDE_LINES", id: selectedImage.id, guideLines: [...currentLines, { pos, axis: guidePlacementAxis }] });
         onGuidePlaced?.();
       }
       return true;
     },
-    [guidePlacementAxis, eraserActive, state.refLines, dispatch, onGuidePlaced],
+    [guidePlacementAxis, eraserActive, selectedImage, dispatch, onGuidePlaced],
   );
 
   // Guide line drag handlers
@@ -594,7 +596,7 @@ export default function CropPreview({
         const container = containerRef.current;
         if (container) {
           if (hitIdx != null) {
-            const lines = state.refLines;
+            const lines = selectedImage?.editState?.guideLines ?? [];
             container.style.cursor = lines[hitIdx]?.axis === "h" ? "ns-resize" : "ew-resize";
           } else {
             container.style.cursor = "";
@@ -602,19 +604,19 @@ export default function CropPreview({
         }
       }
 
-      if (!guideDragRef.current) return;
+      if (!guideDragRef.current || !selectedImage?.id) return;
       const canvas = canvasRef.current;
       if (!canvas) return;
       const rect = canvas.getBoundingClientRect();
       const relX = (e.clientX - rect.left) / rect.width;
       const relY = (e.clientY - rect.top) / rect.height;
       const { index } = guideDragRef.current;
-      const lines = [...state.refLines];
+      const lines = [...(selectedImage?.editState?.guideLines ?? [])];
       const axis = lines[index].axis;
       lines[index] = { ...lines[index], pos: Math.max(0, Math.min(1, axis === "h" ? relY : relX)) };
-      dispatch({ type: "SET_REF_LINES", lines });
+      dispatch({ type: "SET_GUIDE_LINES", id: selectedImage.id, guideLines: lines });
     },
-    [state.showGuides, eraserActive, getGuideLineAt, state.refLines, dispatch],
+    [state.showGuides, eraserActive, getGuideLineAt, selectedImage, dispatch],
   );
 
   const handleGuidePointerUp = useCallback(
@@ -626,24 +628,24 @@ export default function CropPreview({
 
       // Drag end — remove if dragged outside canvas
       const canvas = canvasRef.current;
-      if (canvas) {
+      if (canvas && selectedImage?.id) {
         const rect = canvas.getBoundingClientRect();
         const relX = (e.clientX - rect.left) / rect.width;
         const relY = (e.clientY - rect.top) / rect.height;
         const { index } = guideDragRef.current;
-        const lines = [...state.refLines];
+        const lines = [...(selectedImage?.editState?.guideLines ?? [])];
         const axis = lines[index].axis;
         const outOfBounds = axis === "h"
           ? (relY < -0.02 || relY > 1.02)
           : (relX < -0.02 || relX > 1.02);
         if (outOfBounds) {
           lines.splice(index, 1);
-          dispatch({ type: "SET_REF_LINES", lines });
+          dispatch({ type: "SET_GUIDE_LINES", id: selectedImage.id, guideLines: lines });
         }
       }
       guideDragRef.current = null;
     },
-    [state.refLines, dispatch],
+    [selectedImage, dispatch],
   );
 
   const brushCursor = useMemo(() => {
@@ -658,21 +660,21 @@ export default function CropPreview({
 
   // Delete/Backspace removes the last reference line
   useEffect(() => {
-    if (!state.showGuides) return;
+    if (!state.showGuides || !selectedImage?.id) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Delete" || e.key === "Backspace") {
         const tag = (e.target as HTMLElement)?.tagName;
         if (tag === "INPUT" || tag === "TEXTAREA") return;
-        const lines = [...state.refLines];
+        const lines = [...(selectedImage?.editState?.guideLines ?? [])];
         if (lines.length === 0) return;
         e.preventDefault();
         lines.pop();
-        dispatch({ type: "SET_REF_LINES", lines });
+        dispatch({ type: "SET_GUIDE_LINES", id: selectedImage.id, guideLines: lines });
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [state.showGuides, state.refLines, dispatch]);
+  }, [state.showGuides, selectedImage, dispatch]);
 
   if (!selectedImage || selectedImage.status !== "ready") {
     return (
@@ -722,13 +724,13 @@ export default function CropPreview({
       }}
       onPointerLeave={handlePointerLeave}
       onContextMenu={(e) => {
-        if (!state.showGuides) return;
+        if (!state.showGuides || !selectedImage?.id) return;
         const hitIdx = getGuideLineAt(e.clientX, e.clientY);
         if (hitIdx != null) {
           e.preventDefault();
-          const lines = [...state.refLines];
+          const lines = [...(selectedImage?.editState?.guideLines ?? [])];
           lines.splice(hitIdx, 1);
-          dispatch({ type: "SET_REF_LINES", lines });
+          dispatch({ type: "SET_GUIDE_LINES", id: selectedImage.id, guideLines: lines });
         }
       }}
     >
