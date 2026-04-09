@@ -6,9 +6,8 @@ import type { PointSelection } from "../lib/types";
 import { renderMaskOverlay } from "../lib/overlay";
 import { evalBezier } from "../lib/crop";
 
-const LOUPE_CSS = 320;
 const LOUPE_ZOOM_CORNER = 3;
-const LOUPE_ZOOM_CP = 1.8;
+const LOUPE_ZOOM_CP = 2.5;
 
 // Canvas colors — mirror design tokens (canvas API can't read CSS vars)
 const CANVAS_BG = "#111115";        // --bg-secondary
@@ -26,8 +25,8 @@ const GUIDE_LINE_STROKE = "rgba(245, 158, 11, 0.8)";
 const GUIDE_LINE_STROKE_SEL = "rgba(245, 158, 11, 1)";
 const GUIDE_CP_FILL = "rgba(245, 158, 11, 0.4)";
 const GUIDE_CP_FILL_SEL = "rgba(245, 158, 11, 0.7)";
-const GUIDE_EP_FILL = "rgba(245, 158, 11, 0.5)";
-const GUIDE_EP_FILL_SEL = "rgba(245, 158, 11, 0.8)";
+const GUIDE_EP_FILL = "rgba(245, 158, 11, 0.15)";
+const GUIDE_EP_FILL_SEL = "rgba(245, 158, 11, 0.35)";
 
 interface Props {
   onDragStart: () => void;
@@ -39,8 +38,10 @@ interface Props {
 }
 
 export default function QuadEditor({ onDragStart, onDragEnd, guideAddMode, onGuideAddClick }: Props) {
+  const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const loupeRef = useRef<HTMLCanvasElement>(null);
+  const [containerSize, setContainerSize] = useState<{ w: number; h: number }>({ w: 800, h: 600 });
   const { state, dispatch } = useApp();
   const selectedImage = state.images.find(
     (img) => img.id === state.selectedImageId,
@@ -59,6 +60,21 @@ export default function QuadEditor({ onDragStart, onDragEnd, guideAddMode, onGui
     corners: [[number, number], [number, number]];
     midpoint: [number, number];
   } | null>(null);
+
+  // Track container size for dynamic loupe sizing
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([entry]) => {
+      const { width, height } = entry.contentRect;
+      setContainerSize({ w: width, h: height });
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const loupeW = Math.round(containerSize.w * 0.5);
+  const loupeH = Math.round(containerSize.h * 0.6);
 
   useEffect(() => {
     if (!selectedImage?.originalCanvas) return;
@@ -87,8 +103,8 @@ export default function QuadEditor({ onDragStart, onDragEnd, guideAddMode, onGui
   const maskWidth = selectedImage?.maskWidth ?? 256;
   const maskHeight = selectedImage?.maskHeight ?? 256;
 
-  const padX = Math.round(imgW * 0.15);
-  const padY = Math.round(imgH * 0.15);
+  const padX = 66;
+  const padY = 66;
   const canW = imgW + padX * 2;
   const canH = imgH + padY * 2;
 
@@ -112,30 +128,32 @@ export default function QuadEditor({ onDragStart, onDragEnd, guideAddMode, onGui
     const main = canvasRef.current;
     if (!loupe || !main || !dragging) return;
     const dpr = window.devicePixelRatio || 1;
-    const loupePx = LOUPE_CSS * dpr;
-    loupe.width = loupePx;
-    loupe.height = loupePx;
+    const lpxW = loupeW * dpr;
+    const lpxH = loupeH * dpr;
+    loupe.width = lpxW;
+    loupe.height = lpxH;
     const ctx = loupe.getContext("2d")!;
     ctx.imageSmoothingEnabled = true;
     const zoom = selected?.type === "corner" ? LOUPE_ZOOM_CORNER : LOUPE_ZOOM_CP;
     const canvasPerCss = canW / main.clientWidth;
-    const srcSize = (LOUPE_CSS * canvasPerCss) / zoom;
+    const srcW = (loupeW * canvasPerCss) / zoom;
+    const srcH = (loupeH * canvasPerCss) / zoom;
     const [cx, cy] = dragPosRef.current;
-    ctx.drawImage(main, cx - srcSize / 2, cy - srcSize / 2, srcSize, srcSize, 0, 0, loupePx, loupePx);
-    const half = loupePx / 2;
+    ctx.drawImage(main, cx - srcW / 2, cy - srcH / 2, srcW, srcH, 0, 0, lpxW, lpxH);
+    const halfW = lpxW / 2, halfH = lpxH / 2;
     const gap = 8 * dpr, armLen = 20 * dpr;
     ctx.strokeStyle = "rgba(255,255,255,0.8)";
     ctx.lineWidth = 1.5 * dpr;
     ctx.beginPath();
-    ctx.moveTo(half - gap - armLen, half); ctx.lineTo(half - gap, half);
-    ctx.moveTo(half + gap, half); ctx.lineTo(half + gap + armLen, half);
-    ctx.moveTo(half, half - gap - armLen); ctx.lineTo(half, half - gap);
-    ctx.moveTo(half, half + gap); ctx.lineTo(half, half + gap + armLen);
+    ctx.moveTo(halfW - gap - armLen, halfH); ctx.lineTo(halfW - gap, halfH);
+    ctx.moveTo(halfW + gap, halfH); ctx.lineTo(halfW + gap + armLen, halfH);
+    ctx.moveTo(halfW, halfH - gap - armLen); ctx.lineTo(halfW, halfH - gap);
+    ctx.moveTo(halfW, halfH + gap); ctx.lineTo(halfW, halfH + gap + armLen);
     ctx.stroke();
     ctx.strokeStyle = "rgba(255,255,255,0.3)";
     ctx.lineWidth = 2 * dpr;
-    ctx.strokeRect(0, 0, loupePx, loupePx);
-  }, [dragging, canW, selected]);
+    ctx.strokeRect(0, 0, lpxW, lpxH);
+  }, [dragging, canW, selected, loupeW, loupeH]);
 
   // --- Draw ---
   const draw = useCallback(() => {
@@ -152,10 +170,10 @@ export default function QuadEditor({ onDragStart, onDragEnd, guideAddMode, onGui
     const sx = imgW / maskWidth;
     const sy = imgH / maskHeight;
     const lw = Math.max(1.5, Math.round(imgW / 350));
-    const cornerR = Math.max(10, Math.round(imgW / 45));
-    const cornerRSel = Math.max(14, Math.round(imgW / 30));
-    const cpR = Math.max(6, Math.round(imgW / 80));
-    const cpRSel = Math.max(10, Math.round(imgW / 50));
+    const cornerR = Math.max(5, Math.round(imgW / 90));
+    const cornerRSel = Math.max(7, Math.round(imgW / 60));
+    const cpR = Math.max(3, Math.round(imgW / 160));
+    const cpRSel = Math.max(5, Math.round(imgW / 100));
 
     const { corners, edgeFits } = editState;
 
@@ -206,8 +224,8 @@ export default function QuadEditor({ onDragStart, onDragEnd, guideAddMode, onGui
     }
 
     // Draw edge midpoint handles for straight edges
-    const ehR = Math.max(8, Math.round(imgW / 60));        // between cpR and cornerR
-    const ehRSel = Math.max(11, Math.round(imgW / 45));
+    const ehR = Math.max(4, Math.round(imgW / 120));
+    const ehRSel = Math.max(6, Math.round(imgW / 90));
     for (let i = 0; i < 4; i++) {
       const fit = edgeFits[i];
       if (fit.isArc) continue;
@@ -278,17 +296,17 @@ export default function QuadEditor({ onDragStart, onDragEnd, guideAddMode, onGui
       ctx.fillStyle = sel ? CORNER_FILL_SEL : CORNER_FILL;
       ctx.fill();
       ctx.strokeStyle = "#fff";
-      ctx.lineWidth = sel ? 6 : 5;
+      ctx.lineWidth = sel ? 3 : 2.5;
       ctx.stroke();
     }
 
     // Draw dewarp guides
     const { dewarpGuides } = editState;
     const glLw = Math.max(2, Math.round(imgW / 300));
-    const glR = Math.max(5, Math.round(imgW / 90));
-    const glRSel = Math.max(8, Math.round(imgW / 60));
-    const glCpR = Math.max(4, Math.round(imgW / 100));
-    const glCpRSel = Math.max(7, Math.round(imgW / 70));
+    const glR = Math.max(3, Math.round(imgW / 180));
+    const glRSel = Math.max(4, Math.round(imgW / 120));
+    const glCpR = Math.max(2, Math.round(imgW / 200));
+    const glCpRSel = Math.max(4, Math.round(imgW / 140));
 
     for (let gi = 0; gi < dewarpGuides.length; gi++) {
       const g = dewarpGuides[gi];
@@ -376,8 +394,8 @@ export default function QuadEditor({ onDragStart, onDragEnd, guideAddMode, onGui
     // Draw align guides
     const ALIGN_STROKE = "rgba(59, 130, 246, 0.75)";
     const ALIGN_STROKE_SEL = "rgba(96, 165, 250, 1)";
-    const ALIGN_EP_FILL = "rgba(59, 130, 246, 0.85)";
-    const ALIGN_EP_FILL_SEL = "rgba(96, 165, 250, 1)";
+    const ALIGN_EP_FILL = "rgba(59, 130, 246, 0.15)";
+    const ALIGN_EP_FILL_SEL = "rgba(96, 165, 250, 0.35)";
 
     for (let gi = 0; gi < editState.alignGuides.length; gi++) {
       const g = editState.alignGuides[gi];
@@ -740,11 +758,11 @@ export default function QuadEditor({ onDragStart, onDragEnd, guideAddMode, onGui
     }
   }, [dragging, onDragEnd]);
 
-  if (!selectedImage || !editState || !baseCanvas) {
+  if (!selectedImage || !editState || editState.cropCancelled || !baseCanvas) {
     return (
       <div className="flex-1 flex items-center justify-center">
         <p className="text-[var(--text-muted)] text-sm">
-          {selectedImage?.editState === null
+          {editState?.cropCancelled
             ? 'Crop cancelled \u2014 use "Reset to Prediction" to restore'
             : "Select an image to edit"}
         </p>
@@ -753,7 +771,7 @@ export default function QuadEditor({ onDragStart, onDragEnd, guideAddMode, onGui
   }
 
   return (
-    <div className="flex-1 relative flex items-center justify-center p-4 overflow-hidden">
+    <div ref={containerRef} className="flex-1 relative flex items-center justify-center p-4 overflow-hidden">
       <canvas
         ref={canvasRef}
         aria-label="Document boundary editor — drag corners and control points to adjust crop"
@@ -777,7 +795,7 @@ export default function QuadEditor({ onDragStart, onDragEnd, guideAddMode, onGui
         ref={loupeRef}
         className="absolute rounded-lg shadow-lg transition-opacity duration-150"
         style={{
-          width: LOUPE_CSS, height: LOUPE_CSS,
+          width: loupeW, height: loupeH,
           opacity: dragging ? 1 : 0,
           pointerEvents: "none",
           border: "1px solid var(--border)",

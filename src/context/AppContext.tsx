@@ -69,6 +69,7 @@ function cloneEditState(s: EditState): EditState {
       p0: [...g.p0] as [number, number],
       p1: [...g.p1] as [number, number],
     })),
+    cropCancelled: s.cropCancelled,
   };
 }
 
@@ -215,10 +216,23 @@ function reducer(state: AppState, action: AppAction): AppState {
           const past = img.editState
             ? [...img.history.past, cloneEditState(img.editState)]
             : img.history.past;
+          // Keep editState alive with cropCancelled flag so filter/rotation still work
+          const prevFilter = img.editState?.filterConfig ?? { ...DEFAULT_FILTER_CONFIG };
+          const prevRotation = img.editState?.rotation ?? 0;
           return {
             ...img,
-            editState: null,
-            cropCanvas: null,
+            editState: {
+              corners: [],
+              edgeFits: [],
+              rotation: prevRotation,
+              filterConfig: { type: prevFilter.type, binarize: { ...prevFilter.binarize } },
+              eraseMask: null,
+              guideLines: [],
+              dewarpGuides: [],
+              alignGuides: [],
+              cropCancelled: true,
+            },
+            cropCanvas: img.originalCanvas,  // use original image directly (no perspective crop)
             filteredCanvas: null,
             history: { past, future: [] },
           };

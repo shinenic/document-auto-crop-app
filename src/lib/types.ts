@@ -85,6 +85,7 @@ export interface EditState {
   guideLines: GuideLine[];        // reference lines (original)
   dewarpGuides: DewarpGuide[];    // staff line dewarping curves
   alignGuides: AlignGuide[];      // vertical alignment lines
+  cropCancelled?: boolean;        // true = skip perspective crop, use original image
 }
 
 export interface ImageHistory {

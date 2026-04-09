@@ -166,7 +166,8 @@ export default function ToolPanel({
 
   const canUndo = (sel?.history.past.length ?? 0) > 0;
   const canRedo = (sel?.history.future.length ?? 0) > 0;
-  const hasCrop = sel?.editState != null;
+  const hasCrop = sel?.editState != null && !sel.editState.cropCancelled;
+  const hasEditState = sel?.editState != null; // true even when crop cancelled
   const id = sel?.id;
 
   const undo = useCallback(() => { if (id) dispatch({ type: "UNDO", id }); }, [id, dispatch]);
@@ -277,8 +278,8 @@ export default function ToolPanel({
       <div>
         <SectionHeader title="Rotate" />
         <div className="flex gap-1">
-          <Btn icon={<IconRotateCW />} label="CW" shortcut="R" onClick={rotateCW} disabled={!hasCrop} className="flex-1" />
-          <Btn icon={<IconRotateCCW />} label="CCW" shortcut="+R" onClick={rotateCCW} disabled={!hasCrop} className="flex-1" />
+          <Btn icon={<IconRotateCW />} label="CW" shortcut="R" onClick={rotateCW} disabled={!hasEditState} className="flex-1" />
+          <Btn icon={<IconRotateCCW />} label="CCW" shortcut="+R" onClick={rotateCCW} disabled={!hasEditState} className="flex-1" />
         </div>
       </div>
 
@@ -291,18 +292,18 @@ export default function ToolPanel({
           options={[{ label: "Original", value: "none" }, { label: "B&W", value: "binarize" }]}
           value={filterConfig.type}
           onChange={(v) => setFilterType(v as FilterConfig["type"])}
-          disabled={!hasCrop}
+          disabled={!hasEditState}
         />
         {isFilterActive && (
           <div className="flex flex-col gap-2 mt-2">
             <Slider label="Block Radius" value={filterConfig.binarize.blockRadiusBps} min={20} max={1000} step={10}
-              disabled={!hasCrop} onPointerDown={handleSliderPointerDown}
+              disabled={!hasEditState} onPointerDown={handleSliderPointerDown}
               onChange={(v) => updateBinarizeConfig({ blockRadiusBps: v })} />
             <Slider label="Contrast" value={filterConfig.binarize.contrastOffset} min={-50} max={10} step={1}
-              disabled={!hasCrop} onPointerDown={handleSliderPointerDown}
+              disabled={!hasEditState} onPointerDown={handleSliderPointerDown}
               onChange={(v) => updateBinarizeConfig({ contrastOffset: v })} />
             <Slider label="Upscale %" value={filterConfig.binarize.upsamplingScale} min={100} max={400} step={25}
-              disabled={!hasCrop} onPointerDown={handleSliderPointerDown}
+              disabled={!hasEditState} onPointerDown={handleSliderPointerDown}
               onChange={(v) => updateBinarizeConfig({ upsamplingScale: v })} />
           </div>
         )}

@@ -175,6 +175,7 @@ export default function EditorScreen() {
   // Recompute full-res crop when editState changes (undo/redo/rotate/toggle)
   const cropKey = selectedImage?.editState
     ? JSON.stringify({
+        cropCancelled: selectedImage.editState.cropCancelled,
         corners: selectedImage.editState.corners,
         edgeFits: selectedImage.editState.edgeFits,
         dewarpGuides: selectedImage.editState.dewarpGuides,
@@ -190,6 +191,9 @@ export default function EditorScreen() {
     }
     if (cropKey === prevCropKeyRef.current) return;
     prevCropKeyRef.current = cropKey;
+
+    // When crop is cancelled, original canvas is used directly (set by reducer)
+    if (selectedImage.editState.cropCancelled) return;
 
     const quadResult = {
       corners: selectedImage.editState.corners,
