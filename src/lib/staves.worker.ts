@@ -7,7 +7,6 @@
  */
 
 declare const cv: any; // eslint-disable-line @typescript-eslint/no-explicit-any
-declare function importScripts(...urls: string[]): void;
 
 interface DetectRequest {
   id: number;
@@ -38,18 +37,27 @@ function loadOpenCV(): Promise<void> {
   if (cvLoading) return cvLoading;
 
   cvLoading = new Promise<void>((resolve, reject) => {
-    try {
-      // @ts-expect-error — Module global defined by opencv.js
-      self.Module = {
-        onRuntimeInitialized: () => {
-          cvReady = true;
-          resolve();
-        },
-      };
-      importScripts("https://docs.opencv.org/4.9.0/opencv.js");
-    } catch (err) {
-      reject(new Error("Failed to load OpenCV.js: " + (err instanceof Error ? err.message : String(err))));
-    }
+    // @ts-expect-error — Module global defined by opencv.js WASM runtime
+    self.Module = {
+      onRuntimeInitialized: () => {
+        cvReady = true;
+        resolve();
+      },
+    };
+    // Use fetch+eval instead of importScripts (module workers don't support importScripts)
+    fetch("https://docs.opencv.org/4.9.0/opencv.js")
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.text();
+      })
+      .then((code) => {
+        // eslint-disable-next-line no-eval
+        (0, eval)(code);
+      })
+      .catch((err) => {
+        cvLoading = null; // allow retry on transient failure
+        reject(new Error("Failed to load OpenCV.js: " + (err instanceof Error ? err.message : String(err))));
+      });
   });
 
   return cvLoading;
@@ -148,59 +156,63 @@ function detectStaves(
 
   for (let i = 0; i < contours.size(); i++) {
     const cnt = contours.get(i);
-    const rect = cv.boundingRect(cnt);
-    if (rect.width < minLen) continue;
-    if (rect.height > rect.width * 0.1) continue;
+    try {
+      const rect = cv.boundingRect(cnt);
+      if (rect.width < minLen) continue;
+      if (rect.height > rect.width * 0.1) continue;
 
-    // Extract contour points
-    const pts: Array<{ x: number; y: number }> = [];
-    for (let j = 0; j < cnt.data32S.length; j += 2) {
-      pts.push({ x: cnt.data32S[j], y: cnt.data32S[j + 1] });
+      // Extract contour points (data32S stores [x0,y0,x1,y1,...] for CHAIN_APPROX_SIMPLE)
+      const pts: Array<{ x: number; y: number }> = [];
+      for (let j = 0; j < cnt.data32S.length; j += 2) {
+        pts.push({ x: cnt.data32S[j], y: cnt.data32S[j + 1] });
+      }
+
+      // Median y for sorting
+      const ys = pts.map((p) => p.y);
+      ys.sort((a, b) => a - b);
+      const medianY = ys[Math.floor(ys.length / 2)];
+
+      // --- Phase 5: Polyline extraction + smoothing + downsampling ---
+
+      // Group by x, take median y per x
+      const byX = new Map<number, number[]>();
+      for (const p of pts) {
+        if (!byX.has(p.x)) byX.set(p.x, []);
+        byX.get(p.x)!.push(p.y);
+      }
+      const rawPolyline: Array<{ x: number; y: number }> = [];
+      for (const [px, pys] of byX) {
+        pys.sort((a, b) => a - b);
+        rawPolyline.push({ x: px, y: pys[Math.floor(pys.length / 2)] });
+      }
+      rawPolyline.sort((a, b) => a.x - b.x);
+
+      // Moving average smoothing
+      const smoothed: Array<{ x: number; y: number }> = [];
+      for (let k = 0; k < rawPolyline.length; k++) {
+        const lo = Math.max(0, k - Math.floor(PARAMS.smoothWin / 2));
+        const hi = Math.min(rawPolyline.length - 1, k + Math.floor(PARAMS.smoothWin / 2));
+        let sumY = 0;
+        for (let m = lo; m <= hi; m++) sumY += rawPolyline[m].y;
+        smoothed.push({ x: rawPolyline[k].x, y: sumY / (hi - lo + 1) });
+      }
+
+      // Trim endpoints (barline intersections)
+      const trimPx = Math.max(5, Math.round(smoothed.length * 0.02));
+      const trimmed = smoothed.slice(trimPx, smoothed.length - trimPx);
+      if (trimmed.length < 2) continue;
+
+      // Subsample to control points
+      const finalPolyline = [trimmed[0]];
+      for (let k = PARAMS.ctrlStep; k < trimmed.length - 1; k += PARAMS.ctrlStep) {
+        finalPolyline.push(trimmed[k]);
+      }
+      if (trimmed.length > 1) finalPolyline.push(trimmed[trimmed.length - 1]);
+
+      results.push({ y: medianY, points: finalPolyline });
+    } finally {
+      cnt.delete();
     }
-
-    // Median y for sorting
-    const ys = pts.map((p) => p.y);
-    ys.sort((a, b) => a - b);
-    const medianY = ys[Math.floor(ys.length / 2)];
-
-    // --- Phase 5: Polyline extraction + smoothing + downsampling ---
-
-    // Group by x, take median y per x
-    const byX = new Map<number, number[]>();
-    for (const p of pts) {
-      if (!byX.has(p.x)) byX.set(p.x, []);
-      byX.get(p.x)!.push(p.y);
-    }
-    const rawPolyline: Array<{ x: number; y: number }> = [];
-    for (const [px, pys] of byX) {
-      pys.sort((a, b) => a - b);
-      rawPolyline.push({ x: px, y: pys[Math.floor(pys.length / 2)] });
-    }
-    rawPolyline.sort((a, b) => a.x - b.x);
-
-    // Moving average smoothing
-    const smoothed: Array<{ x: number; y: number }> = [];
-    for (let k = 0; k < rawPolyline.length; k++) {
-      const lo = Math.max(0, k - Math.floor(PARAMS.smoothWin / 2));
-      const hi = Math.min(rawPolyline.length - 1, k + Math.floor(PARAMS.smoothWin / 2));
-      let sumY = 0;
-      for (let m = lo; m <= hi; m++) sumY += rawPolyline[m].y;
-      smoothed.push({ x: rawPolyline[k].x, y: sumY / (hi - lo + 1) });
-    }
-
-    // Trim endpoints (barline intersections)
-    const trimPx = Math.max(5, Math.round(smoothed.length * 0.02));
-    const trimmed = smoothed.slice(trimPx, smoothed.length - trimPx);
-    if (trimmed.length < 2) continue;
-
-    // Subsample to control points
-    const finalPolyline = [trimmed[0]];
-    for (let k = PARAMS.ctrlStep; k < trimmed.length - 1; k += PARAMS.ctrlStep) {
-      finalPolyline.push(trimmed[k]);
-    }
-    if (trimmed.length > 1) finalPolyline.push(trimmed[trimmed.length - 1]);
-
-    results.push({ y: medianY, points: finalPolyline });
   }
   contours.delete();
 
