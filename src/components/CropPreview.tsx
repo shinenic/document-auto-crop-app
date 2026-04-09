@@ -6,6 +6,7 @@ import { rotateCanvas } from "../lib/crop";
 import { applyEraseMask, createEraseMask, paintBrushStroke, fillLassoRegion } from "../lib/eraser";
 import { drawProgressive } from "../lib/drawProgressive";
 import type { GuideLine } from "../lib/types";
+import type { GridConfig } from "./GridOverlay";
 
 const LOUPE_CSS = 260;
 const LOUPE_ZOOM = 2.5;
@@ -18,6 +19,7 @@ export default function CropPreview({
   previewBg = "checker",
   guidePlacementAxis = null,
   onGuidePlaced,
+  gridConfig,
 }: {
   eraserActive?: boolean;
   eraserTool?: "brush" | "lasso";
@@ -25,6 +27,7 @@ export default function CropPreview({
   previewBg?: "checker" | "black" | "white" | "gray";
   guidePlacementAxis?: "h" | "v" | null;
   onGuidePlaced?: () => void;
+  gridConfig?: GridConfig;
 } = {}) {
   const { state, dispatch } = useApp();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -65,6 +68,14 @@ export default function CropPreview({
 
   const [loupeVisible, setLoupeVisible] = useState(false);
   const [lassoProcessing, setLassoProcessing] = useState(false);
+
+  // Refs for parent-level pointer listener (avoid stale closures)
+  const eraserActiveRef = useRef(eraserActive);
+  eraserActiveRef.current = eraserActive;
+  const drawLoupeStableRef = useRef<(cx: number, cy: number) => void>(() => {});
+  // Grid config ref for drawLoupe (which has [] deps)
+  const gridConfigRef = useRef(gridConfig);
+  gridConfigRef.current = gridConfig;
 
   const selectedImage = state.images.find(
     (img) => img.id === state.selectedImageId,
@@ -181,10 +192,8 @@ export default function CropPreview({
 
     // Check if cursor is over the preview canvas
     if (relX < 0 || relX > 1 || relY < 0 || relY > 1) {
-      loupe.style.opacity = "0";
       return;
     }
-    loupe.style.opacity = "1";
 
     // Source pixel at cursor center
     const srcX = relX * info.srcW;
@@ -253,6 +262,47 @@ export default function CropPreview({
       ctx.restore();
     }
 
+    // Draw grid lines in loupe
+    const gc = gridConfigRef.current;
+    if (gc?.enabled) {
+      const cssPerLoupePx = 1 / (LOUPE_ZOOM * dpr);
+      const visibleCssW = loupePx * cssPerLoupePx;
+      // cursor position relative to grid overlay (≈ containerRef parent)
+      const overlayRect = containerRef.current?.parentElement?.getBoundingClientRect();
+      if (overlayRect) {
+        const curX = clientX - overlayRect.left;
+        const curY = clientY - overlayRect.top;
+        const visibleLeft = curX - visibleCssW / 2;
+        const visibleTop = curY - visibleCssW / 2;
+
+        ctx.save();
+        ctx.strokeStyle = `rgba(${gc.color}, ${gc.opacity})`;
+        ctx.lineWidth = 1 * dpr;
+
+        if (gc.mode === "grid" || gc.mode === "vertical") {
+          const firstX = gc.offset.x + Math.ceil((visibleLeft - gc.offset.x) / gc.spacing) * gc.spacing;
+          for (let gx = firstX; gx <= visibleLeft + visibleCssW; gx += gc.spacing) {
+            const lx = (gx - visibleLeft) * LOUPE_ZOOM * dpr;
+            ctx.beginPath();
+            ctx.moveTo(lx, 0);
+            ctx.lineTo(lx, loupePx);
+            ctx.stroke();
+          }
+        }
+        if (gc.mode === "grid" || gc.mode === "horizontal") {
+          const firstY = gc.offset.y + Math.ceil((visibleTop - gc.offset.y) / gc.spacing) * gc.spacing;
+          for (let gy = firstY; gy <= visibleTop + visibleCssW; gy += gc.spacing) {
+            const ly = (gy - visibleTop) * LOUPE_ZOOM * dpr;
+            ctx.beginPath();
+            ctx.moveTo(0, ly);
+            ctx.lineTo(loupePx, ly);
+            ctx.stroke();
+          }
+        }
+        ctx.restore();
+      }
+    }
+
     // Position loupe near cursor (offset so it doesn't obscure the area)
     const containerRect = containerRef.current?.getBoundingClientRect();
     if (!containerRect) return;
@@ -269,6 +319,29 @@ export default function CropPreview({
 
     loupe.style.left = `${lx}px`;
     loupe.style.top = `${ly}px`;
+  }, []);
+  drawLoupeStableRef.current = drawLoupe;
+
+  // Window-level pointermove so loupe works even when GridOverlay captures pointer events
+  useEffect(() => {
+    const onMove = (e: PointerEvent) => {
+      if (eraserActiveRef.current) return;
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const rect = canvas.getBoundingClientRect();
+      const over =
+        e.clientX >= rect.left && e.clientX <= rect.right &&
+        e.clientY >= rect.top && e.clientY <= rect.bottom;
+      if (over) {
+        setLoupeVisible(true);
+        drawLoupeStableRef.current(e.clientX, e.clientY);
+      } else {
+        setLoupeVisible(false);
+      }
+    };
+
+    window.addEventListener("pointermove", onMove);
+    return () => window.removeEventListener("pointermove", onMove);
   }, []);
 
   // Draw source canvas onto display canvas with DPR scaling
@@ -653,23 +726,15 @@ export default function CropPreview({
     [state.showGuides, eraserActive, guidePlacementAxis, onGuidePlaced, getGuideLineAt, state.images, state.selectedImageId, dispatch],
   );
 
-  // Pointer handlers — direct DOM manipulation for 60fps loupe tracking
+  // Pointer handlers for eraser (loupe is handled by window-level listener)
   const handlePointerMove = useCallback(
     (e: React.PointerEvent) => {
       if (eraserActive) {
         handleEraserPointerMove(e);
-        return;
       }
-      if (!loupeVisible) setLoupeVisible(true);
-      drawLoupe(e.clientX, e.clientY);
     },
-    [eraserActive, handleEraserPointerMove, loupeVisible, drawLoupe],
+    [eraserActive, handleEraserPointerMove],
   );
-
-  const handlePointerLeave = useCallback(() => {
-    setLoupeVisible(false);
-    // Don't cancel eraser on leave — pointer capture keeps it active until pointerUp
-  }, []);
 
   // Build a circular cursor matching the brush size in display coordinates
   const [cursorScale, setCursorScale] = useState(1);
@@ -735,7 +800,6 @@ export default function CropPreview({
         }
         handleGuidePointerUp(e);
       }}
-      onPointerLeave={handlePointerLeave}
       onContextMenu={(e) => {
         if (!state.showGuides) return;
         const hitIdx = getGuideLineAt(e.clientX, e.clientY);
@@ -768,10 +832,10 @@ export default function CropPreview({
           opacity: eraserActive && eraserTool === "lasso" ? 1 : 0,
         }}
       />
-      {/* Loupe (hidden when eraser is active) */}
+      {/* Loupe (hidden when eraser is active; z-20 to float above GridOverlay z-10) */}
       <canvas
         ref={loupeRef}
-        className="pointer-events-none absolute rounded-full shadow-lg"
+        className="pointer-events-none absolute z-20 rounded-full shadow-lg"
         style={{
           width: LOUPE_CSS,
           height: LOUPE_CSS,

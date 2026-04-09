@@ -587,6 +587,7 @@ export default function EditorScreen() {
                 previewBg={previewBg}
                 guidePlacementAxis={guidePlacementAxis}
                 onGuidePlaced={() => setGuidePlacementAxis(null)}
+                gridConfig={gridConfig}
               />
               {gridConfig.enabled && (
                 <GridOverlay
