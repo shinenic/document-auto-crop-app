@@ -11,7 +11,10 @@ import GridOverlay, { DEFAULT_GRID_CONFIG, type GridConfig } from "./GridOverlay
 import { useApp } from "../context/AppContext";
 import { perspectiveCrop, perspectiveCropPiecewise } from "../lib/crop";
 import { applyBinarize } from "../lib/binarize";
+import { detectStaves } from "../lib/staves";
+import { fitCubicBezier } from "../lib/fitBezier";
 import type { AppState, DewarpGuide, AlignGuide } from "../lib/types";
+import { DEFAULT_BINARIZE_CONFIG } from "../lib/types";
 import { useKeyboardShortcuts } from "../hooks/useKeyboardShortcuts";
 
 function getSelectedImage(state: AppState) {
@@ -44,6 +47,16 @@ export default function EditorScreen() {
   const [alignAddMode, setAlignAddMode] = useState(false);
   const [alignAddStep, setAlignAddStep] = useState<"top" | "bottom" | null>(null);
   const [pendingAlignP0, setPendingAlignP0] = useState<[number, number] | null>(null);
+
+  const [stavesDetecting, setStavesDetecting] = useState(false);
+  const [editorToast, setEditorToast] = useState<string | null>(null);
+  const editorToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showEditorToast = useCallback((msg: string) => {
+    if (editorToastTimer.current) clearTimeout(editorToastTimer.current);
+    setEditorToast(msg);
+    editorToastTimer.current = setTimeout(() => setEditorToast(null), 3000);
+  }, []);
 
   // Exit eraser mode when switching images or leaving B&W filter
   const currentFilterType = getSelectedImage(state)?.editState?.filterConfig?.type;
@@ -447,6 +460,68 @@ export default function EditorScreen() {
     dispatch({ type: "SET_EDIT_STATE", id: img.id, editState: { ...img.editState, alignGuides: [] } });
   }, [dispatch]);
 
+  const handleAutoDetectStaves = useCallback(async () => {
+    const img = getSelectedImage(stateRef.current);
+    if (!img?.editState || !img.originalCanvas) return;
+
+    setStavesDetecting(true);
+    try {
+      // Step 1: Binarize the original image with default config
+      const binarizedCanvas = await applyBinarize(
+        img.originalCanvas,
+        DEFAULT_BINARIZE_CONFIG,
+      );
+
+      // Step 2: Detect staff lines
+      const polylines = await detectStaves(binarizedCanvas);
+
+      if (polylines.length === 0) {
+        showEditorToast("No staff lines detected");
+        return;
+      }
+
+      // Step 3: Convert polylines to DewarpGuides
+      // Points from worker are in binarized canvas coords (upscaled).
+      // DewarpGuides use mask space (maskWidth x maskHeight).
+      const bw = binarizedCanvas.width;
+      const bh = binarizedCanvas.height;
+      const mw = img.maskWidth;
+      const mh = img.maskHeight;
+
+      const newGuides: DewarpGuide[] = polylines.map((pts) => {
+        // Scale points from binarized coords to mask space
+        const scaled = pts.map((p) => ({
+          x: (p.x / bw) * mw,
+          y: (p.y / bh) * mh,
+        }));
+        const { p0, cp1, cp2, p3 } = fitCubicBezier(scaled);
+        return { p0, cp1, cp2, p3 };
+      });
+
+      // Step 4: Append to existing guides, sort by vertical position
+      const currentImg = getSelectedImage(stateRef.current);
+      if (!currentImg?.editState) return;
+      const es = currentImg.editState;
+
+      dispatch({ type: "PUSH_HISTORY", id: currentImg.id });
+      const dewarpGuides = [...es.dewarpGuides, ...newGuides].sort(
+        (a, b) => (a.p0[1] + a.p3[1]) / 2 - (b.p0[1] + b.p3[1]) / 2,
+      );
+      dispatch({
+        type: "SET_EDIT_STATE",
+        id: currentImg.id,
+        editState: { ...es, dewarpGuides },
+      });
+
+      showEditorToast(`Detected ${polylines.length} staff line${polylines.length !== 1 ? "s" : ""}`);
+    } catch (err) {
+      console.error("Staff detection failed:", err);
+      showEditorToast("Staff detection failed");
+    } finally {
+      setStavesDetecting(false);
+    }
+  }, [dispatch, showEditorToast]);
+
   const handleResizePointerDown = useCallback((e: React.PointerEvent) => {
     e.preventDefault();
     resizingRef.current = true;
@@ -630,10 +705,19 @@ export default function EditorScreen() {
             else { setAlignAddStep(null); setPendingAlignP0(null); }
           }}
           onClearAlignGuides={handleClearAlignGuides}
+          onAutoDetectStaves={handleAutoDetectStaves}
+          stavesDetecting={stavesDetecting}
         />
       </div>
       {sortModalOpen && (
         <SortModal onClose={() => setSortModalOpen(false)} />
+      )}
+
+      {/* Editor toast */}
+      {editorToast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-lg bg-[var(--bg-elevated)] border border-[var(--border)] shadow-lg text-[12px] text-[var(--text-primary)] animate-[fadeInUp_0.2s_ease-out]">
+          {editorToast}
+        </div>
       )}
 
       {/* Keyboard shortcuts overlay */}
