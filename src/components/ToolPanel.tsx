@@ -152,6 +152,7 @@ export default function ToolPanel({
   eraserActive, onToggleEraser, eraserTool, onSetEraserTool, brushSize, onSetBrushSize,
   guideAddMode, onToggleGuideAdd, onClearGuides,
   alignAddMode, onToggleAlignAdd, onClearAlignGuides,
+  onAutoDetectStaves, stavesDetecting,
 }: {
   eraserActive: boolean; onToggleEraser: () => void;
   eraserTool: "brush" | "lasso"; onSetEraserTool: (tool: "brush" | "lasso") => void;
@@ -160,6 +161,8 @@ export default function ToolPanel({
   onClearGuides: () => void;
   alignAddMode: boolean; onToggleAlignAdd: () => void;
   onClearAlignGuides: () => void;
+  onAutoDetectStaves: () => void;
+  stavesDetecting: boolean;
 }) {
   const { state, dispatch } = useApp();
   const sel = state.images.find((img) => img.id === state.selectedImageId);
@@ -352,6 +355,14 @@ export default function ToolPanel({
             onClick={onToggleGuideAdd}
             disabled={!hasCrop}
             active={guideAddMode}
+          />
+          <Btn
+            icon={stavesDetecting
+              ? <svg className="animate-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" /></svg>
+              : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 18h6M4 6h16M4 10h16M4 14h16" /></svg>}
+            label={stavesDetecting ? "Detecting..." : "Auto Detect"}
+            onClick={onAutoDetectStaves}
+            disabled={!hasCrop || stavesDetecting}
           />
           {(sel?.editState?.dewarpGuides?.length ?? 0) > 0 && (
             <>
