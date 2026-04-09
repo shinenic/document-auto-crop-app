@@ -591,6 +591,7 @@ export default function CropPreview({
       const img = state.images.find((i) => i.id === state.selectedImageId);
       if (!img?.editState) return;
       const lines = [...img.editState.guideLines];
+      if (index >= lines.length) return;
       const axis = lines[index].axis;
       lines[index] = { ...lines[index], pos: Math.max(0, Math.min(1, axis === "h" ? relY : relX)) };
       dispatch({ type: "SET_GUIDE_LINES", id: img.id, guideLines: lines });
@@ -634,14 +635,16 @@ export default function CropPreview({
         const img = state.images.find((i) => i.id === state.selectedImageId);
         if (img?.editState) {
           const lines = [...img.editState.guideLines];
-          const axis = lines[index].axis;
-          const outOfBounds = axis === "h"
-            ? (relY < -0.02 || relY > 1.02)
-            : (relX < -0.02 || relX > 1.02);
-          if (outOfBounds) {
-            // Dragged out — remove this line
-            lines.splice(index, 1);
-            dispatch({ type: "SET_GUIDE_LINES", id: img.id, guideLines: lines });
+          if (index < lines.length) {
+            const axis = lines[index].axis;
+            const outOfBounds = axis === "h"
+              ? (relY < -0.02 || relY > 1.02)
+              : (relX < -0.02 || relX > 1.02);
+            if (outOfBounds) {
+              // Dragged out — remove this line
+              lines.splice(index, 1);
+              dispatch({ type: "SET_GUIDE_LINES", id: img.id, guideLines: lines });
+            }
           }
         }
       }

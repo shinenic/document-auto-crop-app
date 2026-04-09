@@ -151,12 +151,15 @@ function TogglePill({ options, value, onChange, disabled = false }: {
 export default function ToolPanel({
   eraserActive, onToggleEraser, eraserTool, onSetEraserTool, brushSize, onSetBrushSize,
   guideAddMode, onToggleGuideAdd, onClearGuides,
+  alignAddMode, onToggleAlignAdd, onClearAlignGuides,
 }: {
   eraserActive: boolean; onToggleEraser: () => void;
   eraserTool: "brush" | "lasso"; onSetEraserTool: (tool: "brush" | "lasso") => void;
   brushSize: number; onSetBrushSize: (size: number) => void;
   guideAddMode: boolean; onToggleGuideAdd: () => void;
   onClearGuides: () => void;
+  alignAddMode: boolean; onToggleAlignAdd: () => void;
+  onClearAlignGuides: () => void;
 }) {
   const { state, dispatch } = useApp();
   const sel = state.images.find((img) => img.id === state.selectedImageId);
@@ -358,6 +361,36 @@ export default function ToolPanel({
                 <button
                   className="text-[10px] text-[var(--text-muted)] hover:text-[var(--danger)] transition-colors"
                   onClick={onClearGuides}
+                >
+                  Clear
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Align Guides */}
+      <div className="h-px bg-[var(--border)]" />
+      <div>
+        <SectionHeader title="Align Guides" />
+        <div className="flex flex-col gap-1">
+          <Btn
+            icon={<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.2"><line x1="7" y1="2" x2="7" y2="12" /></svg>}
+            label={alignAddMode ? "Click two points" : "+ Add Align"}
+            onClick={onToggleAlignAdd}
+            disabled={!hasCrop}
+            active={alignAddMode}
+          />
+          {(sel?.editState?.alignGuides?.length ?? 0) > 0 && (
+            <>
+              <div className="flex items-center justify-between px-1">
+                <span className="text-[10px] text-[var(--text-muted)]">
+                  {sel?.editState?.alignGuides?.length ?? 0} align guide{(sel?.editState?.alignGuides?.length ?? 0) !== 1 ? "s" : ""}
+                </span>
+                <button
+                  className="text-[10px] text-[var(--text-muted)] hover:text-[var(--danger)] transition-colors"
+                  onClick={onClearAlignGuides}
                 >
                   Clear
                 </button>

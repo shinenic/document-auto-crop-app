@@ -67,6 +67,13 @@ export interface DewarpGuide {
   cp2: [number, number];   // Bezier control point 2 (mask space)
 }
 
+/** A user-drawn align guide: straight line that should become perfectly vertical in the output.
+ *  The system extrapolates to quad T/B edges for column boundaries in the 2D Coons patch grid. */
+export interface AlignGuide {
+  p0: [number, number];    // top endpoint (mask space)
+  p1: [number, number];    // bottom endpoint (mask space)
+}
+
 // --- Editor State ---
 
 export interface EditState {
@@ -77,6 +84,7 @@ export interface EditState {
   eraseMask: EraseMask | null;
   guideLines: GuideLine[];        // reference lines (original)
   dewarpGuides: DewarpGuide[];    // staff line dewarping curves
+  alignGuides: AlignGuide[];      // vertical alignment lines
 }
 
 export interface ImageHistory {
@@ -122,8 +130,8 @@ export interface AppState {
 // --- Selection ---
 
 export interface PointSelection {
-  type: "corner" | "cp1" | "cp2" | "edge" | "guide-left" | "guide-right" | "guide-cp1" | "guide-cp2" | "guide-body";
-  edgeIdx: number;  // for quad points: edge index; for guide points: guide line index
+  type: "corner" | "cp1" | "cp2" | "edge" | "guide-left" | "guide-right" | "guide-cp1" | "guide-cp2" | "guide-body" | "align-top" | "align-bottom" | "align-body";
+  edgeIdx: number;  // for quad points: edge index; for guide/align points: guide index
 }
 
 // --- Constants ---

@@ -20,6 +20,7 @@ interface ManifestEditState {
   edgeFits: EdgeFit[];
   guideLines?: { pos: number; axis: "h" | "v" }[];
   dewarpGuides?: { p0: [number, number]; p3: [number, number]; cp1: [number, number]; cp2: [number, number] }[];
+  alignGuides?: { p0: [number, number]; p1: [number, number] }[];
   rotation: 0 | 90 | 180 | 270;
   filterConfig: { type: "none" | "binarize"; binarize: { blockRadiusBps: number; contrastOffset: number; upsamplingScale: number } };
   eraseMaskFile: string | null;
@@ -54,6 +55,7 @@ function editStateToManifest(es: EditState, eraseMaskFile: string | null): Manif
     edgeFits: es.edgeFits.map(f => ({ cp1: [...f.cp1] as [number, number], cp2: [...f.cp2] as [number, number], isArc: f.isArc })),
     guideLines: es.guideLines.map(g => ({ pos: g.pos, axis: g.axis })),
     dewarpGuides: es.dewarpGuides.map(g => ({ p0: [...g.p0] as [number, number], p3: [...g.p3] as [number, number], cp1: [...g.cp1] as [number, number], cp2: [...g.cp2] as [number, number] })),
+    alignGuides: es.alignGuides.map(g => ({ p0: [...g.p0] as [number, number], p1: [...g.p1] as [number, number] })),
     rotation: es.rotation,
     filterConfig: { type: es.filterConfig.type, binarize: { ...es.filterConfig.binarize } },
     eraseMaskFile,
@@ -69,6 +71,7 @@ function manifestToEditState(m: ManifestEditState, eraseMask: EraseMask | null):
     eraseMask,
     guideLines: (m.guideLines ?? []).map(g => ({ pos: g.pos, axis: g.axis })),
     dewarpGuides: (m.dewarpGuides ?? []).map(g => ({ p0: [...g.p0] as [number, number], p3: [...g.p3] as [number, number], cp1: [...g.cp1] as [number, number], cp2: [...g.cp2] as [number, number] })),
+    alignGuides: (m.alignGuides ?? []).map(g => ({ p0: [...g.p0] as [number, number], p1: [...g.p1] as [number, number] })),
   };
 }
 

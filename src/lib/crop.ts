@@ -4,7 +4,7 @@
  * perspectiveCrop: Coons patch with arc-length parameterized Bezier boundaries
  * perspectiveHomography: Standard 4-point homography (straight edges only)
  */
-import type { QuadResult, DewarpGuide } from "./types";
+import type { QuadResult, DewarpGuide, AlignGuide } from "./types";
 
 // ─── Bezier evaluation ──────────────────────────────────────────────────────
 
@@ -225,19 +225,88 @@ function extrapolateGuide(
   };
 }
 
-// ─── Piecewise Coons patch crop ────────────────────────────────────────────
+// ─── Arc-length interpolation on a precomputed table ───────────────────────
+
+function arcLengthAt(table: Float64Array, t: number): number {
+  const idx = t * (table.length - 1);
+  const lo = Math.floor(idx);
+  const hi = Math.min(lo + 1, table.length - 1);
+  if (lo === hi) return table[lo];
+  return table[lo] + (table[hi] - table[lo]) * (idx - lo);
+}
+
+// ─── Align guide extrapolation ─────────────────────────────────────────────
+
+/** Find u-parameter on a horizontal curve closest to a given point. */
+function projectToHCurve(
+  curveEval: (u: number) => Pt, target: Pt, samples = 80,
+): number {
+  let bestU = 0.5, bestDist = Infinity;
+  for (let i = 0; i <= samples; i++) {
+    const u = i / samples;
+    const pt = curveEval(u);
+    const d = Math.hypot(pt[0] - target[0], pt[1] - target[1]);
+    if (d < bestDist) { bestDist = d; bestU = u; }
+  }
+  return Math.max(0.001, Math.min(0.999, bestU));
+}
+
+/** Find u-parameter where a horizontal curve crosses a straight line (A→B). */
+function findLineCurveU(
+  curveEval: (u: number) => Pt, lineA: Pt, lineB: Pt, samples = 200,
+): number {
+  const dx = lineB[0] - lineA[0], dy = lineB[1] - lineA[1];
+  let prevCross = 0;
+  for (let i = 0; i <= samples; i++) {
+    const u = i / samples;
+    const p = curveEval(u);
+    const cross = dx * (p[1] - lineA[1]) - dy * (p[0] - lineA[0]);
+    if (i > 0 && prevCross * cross <= 0 && (Math.abs(prevCross) + Math.abs(cross) > 1e-12)) {
+      // Sign change — bisect
+      let lo = (i - 1) / samples, hi = u;
+      for (let j = 0; j < 20; j++) {
+        const mid = (lo + hi) / 2;
+        const mp = curveEval(mid);
+        const mc = dx * (mp[1] - lineA[1]) - dy * (mp[0] - lineA[0]);
+        if (mc * prevCross > 0) lo = mid; else hi = mid;
+      }
+      return (lo + hi) / 2;
+    }
+    prevCross = cross;
+  }
+  // No crossing found — project closest point
+  let bestU = 0.5, bestDist = Infinity;
+  for (let i = 0; i <= samples; i++) {
+    const u = i / samples;
+    const p = curveEval(u);
+    // Distance to infinite line
+    const len2 = dx * dx + dy * dy;
+    const t = len2 > 0 ? ((p[0] - lineA[0]) * dx + (p[1] - lineA[1]) * dy) / len2 : 0;
+    const proj: Pt = [lineA[0] + t * dx, lineA[1] + t * dy];
+    const d = Math.hypot(p[0] - proj[0], p[1] - proj[1]);
+    if (d < bestDist) { bestDist = d; bestU = u; }
+  }
+  return bestU;
+}
+
+// ─── Piecewise 2D Coons patch crop ────────────────────────────────────────
 
 /**
- * Piecewise Coons patch: guide lines split the quad into horizontal strips.
- * Guide line endpoints may be inside the quad — they are extrapolated to
- * the L/R edges with C1-continuous extensions.
- * Each strip gets an independent Coons patch, producing a horizontal band.
- * Strips are stacked vertically to form the final output.
+ * 2D piecewise Coons patch: dewarp guides split into rows, align guides split into columns.
+ * Dewarp guide endpoints are extrapolated to L/R edges; align guide endpoints to T/B edges.
+ * Each cell in the grid gets an independent Coons patch.
+ *
+ * Key invariants:
+ * - Dewarp guide curves map to horizontal lines in output (row boundaries)
+ * - Align guide lines map to vertical lines in output (column boundaries)
+ * - Row heights ∝ arc-length along L/R edges
+ * - Column widths ∝ arc-length along T/B edges
  */
 export function perspectiveCropPiecewise(
   originalCanvas: HTMLCanvasElement,
   quadResult: QuadResult,
   dewarpGuides: DewarpGuide[],
+  alignGuides: AlignGuide[],
   maskWidth: number,
   maskHeight: number,
   maxSize?: number,
@@ -248,44 +317,74 @@ export function perspectiveCropPiecewise(
 
   const P00 = corners[0], P10 = corners[1], P11 = corners[2], P01 = corners[3];
 
-  // L: TL→BL (edge 3, reversed CPs), R: TR→BR (edge 1)
+  // Edge curves: L(TL→BL), R(TR→BR), T(TL→TR), B(BL→BR)
   const Lraw: BezierPts = [P00, edgeFits[3].cp2, edgeFits[3].cp1, P01];
   const Rraw: BezierPts = [P10, edgeFits[1].cp1, edgeFits[1].cp2, P11];
+  const Traw: BezierPts = [P00, edgeFits[0].cp1, edgeFits[0].cp2, P10];
+  const Braw: BezierPts = [P01, edgeFits[2].cp2, edgeFits[2].cp1, P11];
 
-  // Extrapolate each dewarp guide to the edges
-  const extrapolated = dewarpGuides.map(g => extrapolateGuide(g, Lraw, Rraw));
-
-  // Sort by average v position
-  const sorted = [...extrapolated].sort((a, b) => (a.leftV + a.rightV) / 2 - (b.leftV + b.rightV) / 2);
-
-  // V-boundaries
-  const vBounds: number[] = [0];
-  for (const g of sorted) vBounds.push((g.leftV + g.rightV) / 2);
-  vBounds.push(1);
-
-  // Boundary evaluators
-  interface BoundaryEval {
+  // ─── Horizontal boundaries (rows) ───────────────────────────────────────
+  interface HBoundary {
+    leftV: number;
+    rightV: number;
     eval: (u: number) => Pt;
     leftPt: Pt;
     rightPt: Pt;
   }
 
-  const boundaryEvals: BoundaryEval[] = [];
+  const hBounds: HBoundary[] = [];
 
   // Top edge
-  const topEval = makeArcLengthEval(P00, edgeFits[0].cp1, edgeFits[0].cp2, P10);
-  boundaryEvals.push({ eval: topEval, leftPt: P00, rightPt: P10 });
+  const topEval = makeArcLengthEval(Traw[0], Traw[1], Traw[2], Traw[3]);
+  hBounds.push({ leftV: 0, rightV: 0, eval: topEval, leftPt: P00, rightPt: P10 });
 
-  // Guide lines (extrapolated to edges)
-  for (const g of sorted) {
-    boundaryEvals.push({ eval: g.eval, leftPt: g.leftPt, rightPt: g.rightPt });
+  // Dewarp guides (extrapolated to L/R edges)
+  if (dewarpGuides.length > 0) {
+    const extrapolated = dewarpGuides.map(g => extrapolateGuide(g, Lraw, Rraw));
+    const sorted = [...extrapolated].sort((a, b) => (a.leftV + a.rightV) / 2 - (b.leftV + b.rightV) / 2);
+    for (const g of sorted) {
+      hBounds.push({ leftV: g.leftV, rightV: g.rightV, eval: g.eval, leftPt: g.leftPt, rightPt: g.rightPt });
+    }
   }
 
-  // Bottom edge (reversed)
-  const botEval = makeArcLengthEval(P01, edgeFits[2].cp2, edgeFits[2].cp1, P11);
-  boundaryEvals.push({ eval: botEval, leftPt: P01, rightPt: P11 });
+  // Bottom edge
+  const botEval = makeArcLengthEval(Braw[0], Braw[1], Braw[2], Braw[3]);
+  hBounds.push({ leftV: 1, rightV: 1, eval: botEval, leftPt: P01, rightPt: P11 });
 
-  // Output dimensions
+  // ─── Vertical boundaries (columns) ─────────────────────────────────────
+  interface VBoundary {
+    topU: number;
+    botU: number;
+    topPt: Pt;
+    botPt: Pt;
+  }
+
+  const vBounds: VBoundary[] = [];
+
+  // Left edge
+  vBounds.push({ topU: 0, botU: 0, topPt: P00, botPt: P01 });
+
+  // Align guides (extrapolated to T/B edges)
+  if (alignGuides.length > 0) {
+    const topArcEval = makeArcLengthEval(Traw[0], Traw[1], Traw[2], Traw[3]);
+    const botArcEval = makeArcLengthEval(Braw[0], Braw[1], Braw[2], Braw[3]);
+    const projected = alignGuides.map(g => {
+      // Find where the LINE through p0→p1 intersects the top/bottom edges
+      // (not closest-point projection, which would miss the true line direction)
+      const topU = findLineCurveU(topArcEval, g.p0, g.p1);
+      const botU = findLineCurveU(botArcEval, g.p0, g.p1);
+      const topPt = topArcEval(topU);
+      const botPt = botArcEval(botU);
+      return { topU, botU, topPt, botPt };
+    });
+    projected.sort((a, b) => (a.topU + a.botU) / 2 - (b.topU + b.botU) / 2);
+    for (const g of projected) vBounds.push(g);
+  }
+
+  // Right edge
+  vBounds.push({ topU: 1, botU: 1, topPt: P10, botPt: P11 });
+
+  // ─── Output dimensions ─────────────────────────────────────────────────
   const imgCorners: [number, number][] = corners.map((c) => [c[0] * sX, c[1] * sY]);
   const dims = computeCropDimensions(imgCorners, imgW, imgH);
   if (!dims) return null;
@@ -299,6 +398,102 @@ export function perspectiveCropPiecewise(
   }
   if (outW < 2 || outH < 2) return null;
 
+  // ─── Row heights (arc-length along L/R edges) ─────────────────────────
+  const leftArcTable = buildArcLengthTable(Lraw[0], Lraw[1], Lraw[2], Lraw[3]);
+  const rightArcTable = buildArcLengthTable(Rraw[0], Rraw[1], Rraw[2], Rraw[3]);
+  const numRows = hBounds.length - 1;
+  const rowWeights: number[] = [];
+  for (let i = 0; i < numRows; i++) {
+    const lLen = arcLengthAt(leftArcTable, hBounds[i + 1].leftV) - arcLengthAt(leftArcTable, hBounds[i].leftV);
+    const rLen = arcLengthAt(rightArcTable, hBounds[i + 1].rightV) - arcLengthAt(rightArcTable, hBounds[i].rightV);
+    rowWeights.push(Math.max((lLen + rLen) / 2, 0.001));
+  }
+  const totalRowWeight = rowWeights.reduce((a, b) => a + b, 0);
+  const rowHeights: number[] = [];
+  let allocH = 0;
+  for (let i = 0; i < numRows; i++) {
+    const h = i < numRows - 1 ? Math.max(1, Math.round((rowWeights[i] / totalRowWeight) * outH)) : Math.max(1, outH - allocH);
+    rowHeights.push(h);
+    allocH += h;
+  }
+
+  // ─── Column widths (arc-length along T/B edges) ───────────────────────
+  // topU/botU are arc-length-parameterized u values, so arc length between
+  // u1 and u2 is simply (u2 - u1) * totalLength — no table lookup needed.
+  const totalTopLen = buildArcLengthTable(Traw[0], Traw[1], Traw[2], Traw[3])[200];
+  const totalBotLen = buildArcLengthTable(Braw[0], Braw[1], Braw[2], Braw[3])[200];
+  const numCols = vBounds.length - 1;
+  const colWeights: number[] = [];
+  for (let j = 0; j < numCols; j++) {
+    const tLen = (vBounds[j + 1].topU - vBounds[j].topU) * totalTopLen;
+    const bLen = (vBounds[j + 1].botU - vBounds[j].botU) * totalBotLen;
+    colWeights.push(Math.max((tLen + bLen) / 2, 0.001));
+  }
+  const totalColWeight = colWeights.reduce((a, b) => a + b, 0);
+  const colWidths: number[] = [];
+  let allocW = 0;
+  for (let j = 0; j < numCols; j++) {
+    const w = j < numCols - 1 ? Math.max(1, Math.round((colWeights[j] / totalColWeight) * outW)) : Math.max(1, outW - allocW);
+    colWidths.push(w);
+    allocW += w;
+  }
+
+  // ─── For each h-boundary, find where each v-boundary crosses it ──────
+  // crossU[row][col] = u-parameter on hBounds[row] where vBounds[col] crosses
+  // crossPt[row][col] = the actual point
+  const crossU: number[][] = [];
+  const crossPt: Pt[][] = [];
+  for (let ri = 0; ri < hBounds.length; ri++) {
+    const hb = hBounds[ri];
+    const uRow: number[] = [];
+    const ptRow: Pt[] = [];
+    for (let ci = 0; ci < vBounds.length; ci++) {
+      const vb = vBounds[ci];
+      if (ci === 0) {
+        // Left edge: u=0
+        uRow.push(0);
+        ptRow.push(hb.leftPt);
+      } else if (ci === vBounds.length - 1) {
+        // Right edge: u=1
+        uRow.push(1);
+        ptRow.push(hb.rightPt);
+      } else {
+        // Find where align guide line (topPt→botPt) crosses this h-boundary
+        const u = findLineCurveU(hb.eval, vb.topPt, vb.botPt);
+        uRow.push(u);
+        ptRow.push(hb.eval(u));
+      }
+    }
+    crossU.push(uRow);
+    crossPt.push(ptRow);
+  }
+
+  // ─── For each v-boundary, find where each h-boundary crosses it ──────
+  // For left/right edges, use leftV/rightV directly.
+  // For align guides, we need the v-parameter along the straight line.
+  // crossV[col][row] = parameter along v-boundary col at h-boundary row
+  const crossV: number[][] = [];
+  for (let ci = 0; ci < vBounds.length; ci++) {
+    const vRow: number[] = [];
+    for (let ri = 0; ri < hBounds.length; ri++) {
+      if (ci === 0) {
+        vRow.push(hBounds[ri].leftV);
+      } else if (ci === vBounds.length - 1) {
+        vRow.push(hBounds[ri].rightV);
+      } else {
+        // Parameter along the straight line from topPt to botPt
+        const vb = vBounds[ci];
+        const pt = crossPt[ri][ci];
+        const dx = vb.botPt[0] - vb.topPt[0], dy = vb.botPt[1] - vb.topPt[1];
+        const len2 = dx * dx + dy * dy;
+        const t = len2 > 0 ? ((pt[0] - vb.topPt[0]) * dx + (pt[1] - vb.topPt[1]) * dy) / len2 : 0;
+        vRow.push(Math.max(0, Math.min(1, t)));
+      }
+    }
+    crossV.push(vRow);
+  }
+
+  // ─── Render cells ─────────────────────────────────────────────────────
   const srcData = originalCanvas.getContext("2d")!.getImageData(0, 0, imgW, imgH);
   const outCanvas = document.createElement("canvas");
   outCanvas.width = outW;
@@ -306,81 +501,131 @@ export function perspectiveCropPiecewise(
   const outCtx = outCanvas.getContext("2d")!;
   const outData = outCtx.createImageData(outW, outH);
 
-  const numStrips = vBounds.length - 1;
-  let yOffset = 0;
+  let yOff = 0;
+  for (let ri = 0; ri < numRows; ri++) {
+    const cellH = rowHeights[ri];
+    let xOff = 0;
+    for (let ci = 0; ci < numCols; ci++) {
+      const cellW = colWidths[ci];
 
-  for (let si = 0; si < numStrips; si++) {
-    const vTop = vBounds[si];
-    const vBot = vBounds[si + 1];
-    const vSpan = vBot - vTop;
+      // 4 corner points of this cell
+      const cP00 = crossPt[ri][ci];
+      const cP10 = crossPt[ri][ci + 1];
+      const cP01 = crossPt[ri + 1][ci];
+      const cP11 = crossPt[ri + 1][ci + 1];
 
-    const stripH = si < numStrips - 1
-      ? Math.round(outH * vSpan)
-      : outH - yOffset;
+      // Top boundary: sub-curve of hBounds[ri] from crossU[ri][ci] to crossU[ri][ci+1]
+      const topU0 = crossU[ri][ci], topU1 = crossU[ri][ci + 1];
+      const topCellEval = makeSubCurveEval(hBounds[ri].eval, topU0, topU1, cellW);
 
-    if (stripH < 1) continue;
+      // Bottom boundary: sub-curve of hBounds[ri+1]
+      const botU0 = crossU[ri + 1][ci], botU1 = crossU[ri + 1][ci + 1];
+      const botCellEval = makeSubCurveEval(hBounds[ri + 1].eval, botU0, botU1, cellW);
 
-    const topB = boundaryEvals[si];
-    const botB = boundaryEvals[si + 1];
+      // Left boundary: straight line from cP00 to cP01 (for align guides and edges)
+      const leftCellEval = ci === 0
+        ? makeEdgeSubEval(Lraw, crossV[0][ri], crossV[0][ri + 1])
+        : makeStraightEval(cP00, cP01);
 
-    const lSub = subBezier(Lraw[0], Lraw[1], Lraw[2], Lraw[3], vTop, vBot);
-    const leftEval = makeArcLengthEval(lSub[0], lSub[1], lSub[2], lSub[3]);
+      // Right boundary: straight line from cP10 to cP11
+      const rightCellEval = ci === numCols - 1
+        ? makeEdgeSubEval(Rraw, crossV[vBounds.length - 1][ri], crossV[vBounds.length - 1][ri + 1])
+        : makeStraightEval(cP10, cP11);
 
-    const rSub = subBezier(Rraw[0], Rraw[1], Rraw[2], Rraw[3], vTop, vBot);
-    const rightEval = makeArcLengthEval(rSub[0], rSub[1], rSub[2], rSub[3]);
-
-    const sP00 = topB.leftPt, sP10 = topB.rightPt;
-    const sP01 = botB.leftPt, sP11 = botB.rightPt;
-
-    const topPts = new Float64Array(outW * 2);
-    const botPts = new Float64Array(outW * 2);
-    for (let px = 0; px < outW; px++) {
-      const u = px / (outW - 1);
-      const t = topB.eval(u), b = botB.eval(u);
-      topPts[px * 2] = t[0]; topPts[px * 2 + 1] = t[1];
-      botPts[px * 2] = b[0]; botPts[px * 2 + 1] = b[1];
-    }
-
-    for (let py = 0; py < stripH; py++) {
-      const v = stripH > 1 ? py / (stripH - 1) : 0.5;
-      const lv = leftEval(v), rv = rightEval(v);
-      const omv = 1 - v;
-
-      for (let px = 0; px < outW; px++) {
-        const u = px / (outW - 1);
-        const omu = 1 - u;
-        const tu0 = topPts[px * 2], tu1 = topPts[px * 2 + 1];
-        const bu0 = botPts[px * 2], bu1 = botPts[px * 2 + 1];
-
-        const mx = omv * tu0 + v * bu0 + omu * lv[0] + u * rv[0]
-          - omu * omv * sP00[0] - u * omv * sP10[0] - omu * v * sP01[0] - u * v * sP11[0];
-        const my = omv * tu1 + v * bu1 + omu * lv[1] + u * rv[1]
-          - omu * omv * sP00[1] - u * omv * sP10[1] - omu * v * sP01[1] - u * v * sP11[1];
-
-        const srcX = mx * sX, srcY = my * sY;
-        if (srcX < 0 || srcX >= imgW - 1 || srcY < 0 || srcY >= imgH - 1) continue;
-
-        const ix = Math.floor(srcX), iy = Math.floor(srcY);
-        const fx = srcX - ix, fy = srcY - iy;
-        const outIdx = ((yOffset + py) * outW + px) * 4;
-        for (let c = 0; c < 3; c++) {
-          const v00 = srcData.data[(iy * imgW + ix) * 4 + c];
-          const v10 = srcData.data[(iy * imgW + ix + 1) * 4 + c];
-          const v01 = srcData.data[((iy + 1) * imgW + ix) * 4 + c];
-          const v11 = srcData.data[((iy + 1) * imgW + ix + 1) * 4 + c];
-          outData.data[outIdx + c] = Math.round(
-            v00 * (1 - fx) * (1 - fy) + v10 * fx * (1 - fy) + v01 * (1 - fx) * fy + v11 * fx * fy,
-          );
-        }
-        outData.data[outIdx + 3] = 255;
+      // Precompute top/bottom rows
+      const topPts = new Float64Array(cellW * 2);
+      const botPts = new Float64Array(cellW * 2);
+      for (let px = 0; px < cellW; px++) {
+        const u = cellW > 1 ? px / (cellW - 1) : 0.5;
+        const tp = topCellEval(u), bp = botCellEval(u);
+        topPts[px * 2] = tp[0]; topPts[px * 2 + 1] = tp[1];
+        botPts[px * 2] = bp[0]; botPts[px * 2 + 1] = bp[1];
       }
-    }
 
-    yOffset += stripH;
+      for (let py = 0; py < cellH; py++) {
+        const v = cellH > 1 ? py / (cellH - 1) : 0.5;
+        const lv = leftCellEval(v), rv = rightCellEval(v);
+        const omv = 1 - v;
+
+        for (let px = 0; px < cellW; px++) {
+          const u = cellW > 1 ? px / (cellW - 1) : 0.5;
+          const omu = 1 - u;
+          const tu0 = topPts[px * 2], tu1 = topPts[px * 2 + 1];
+          const bu0 = botPts[px * 2], bu1 = botPts[px * 2 + 1];
+
+          const mx = omv * tu0 + v * bu0 + omu * lv[0] + u * rv[0]
+            - omu * omv * cP00[0] - u * omv * cP10[0] - omu * v * cP01[0] - u * v * cP11[0];
+          const my = omv * tu1 + v * bu1 + omu * lv[1] + u * rv[1]
+            - omu * omv * cP00[1] - u * omv * cP10[1] - omu * v * cP01[1] - u * v * cP11[1];
+
+          const srcX = mx * sX, srcY = my * sY;
+          if (srcX < 0 || srcX >= imgW - 1 || srcY < 0 || srcY >= imgH - 1) continue;
+
+          const ix = Math.floor(srcX), iy = Math.floor(srcY);
+          const fx = srcX - ix, fy = srcY - iy;
+          const outIdx = ((yOff + py) * outW + (xOff + px)) * 4;
+          for (let c = 0; c < 3; c++) {
+            const v00 = srcData.data[(iy * imgW + ix) * 4 + c];
+            const v10 = srcData.data[(iy * imgW + ix + 1) * 4 + c];
+            const v01 = srcData.data[((iy + 1) * imgW + ix) * 4 + c];
+            const v11 = srcData.data[((iy + 1) * imgW + ix + 1) * 4 + c];
+            outData.data[outIdx + c] = Math.round(
+              v00 * (1 - fx) * (1 - fy) + v10 * fx * (1 - fy) + v01 * (1 - fx) * fy + v11 * fx * fy,
+            );
+          }
+          outData.data[outIdx + 3] = 255;
+        }
+      }
+
+      xOff += cellW;
+    }
+    yOff += cellH;
   }
 
   outCtx.putImageData(outData, 0, 0);
   return outCanvas;
+}
+
+/** Create evaluator for a sub-range of an existing evaluator, with arc-length reparameterization. */
+function makeSubCurveEval(
+  parentEval: (u: number) => Pt, u0: number, u1: number, samples: number,
+): (u: number) => Pt {
+  if (Math.abs(u1 - u0) < 1e-10) return () => parentEval(u0);
+  // Build arc-length table for the sub-range
+  const N = Math.min(samples, 200);
+  const pts: Pt[] = [];
+  for (let i = 0; i <= N; i++) {
+    pts.push(parentEval(u0 + (i / N) * (u1 - u0)));
+  }
+  const cumLen = new Float64Array(N + 1);
+  for (let i = 1; i <= N; i++) {
+    cumLen[i] = cumLen[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
+  }
+  const total = cumLen[N];
+  if (total < 1e-10) return () => pts[0];
+  return (u: number) => {
+    const target = u * total;
+    let lo = 0, hi = N;
+    while (lo < hi - 1) {
+      const mid = (lo + hi) >> 1;
+      if (cumLen[mid] < target) lo = mid; else hi = mid;
+    }
+    const seg = cumLen[hi] - cumLen[lo];
+    const frac = seg > 1e-10 ? (target - cumLen[lo]) / seg : 0;
+    const t = (lo + frac) / N;
+    return parentEval(u0 + t * (u1 - u0));
+  };
+}
+
+/** Straight line evaluator (linear interpolation). */
+function makeStraightEval(p0: Pt, p1: Pt): (v: number) => Pt {
+  return (v: number): Pt => [p0[0] + v * (p1[0] - p0[0]), p0[1] + v * (p1[1] - p0[1])];
+}
+
+/** Arc-length parameterized sub-curve of a Bezier edge. */
+function makeEdgeSubEval(edge: BezierPts, v0: number, v1: number): (v: number) => Pt {
+  const sub = subBezier(edge[0], edge[1], edge[2], edge[3], v0, v1);
+  return makeArcLengthEval(sub[0], sub[1], sub[2], sub[3]);
 }
 
 // ─── Coons patch crop ───────────────────────────────────────────────────────
