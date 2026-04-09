@@ -51,6 +51,29 @@ export interface EraseMask {
   data: Uint8Array; // single-channel: 255 = erased (white), 0 = keep
 }
 
+// --- Guide Lines ---
+
+export interface GuideLine {
+  pos: number;    // 0-1 percentage
+  axis: "h" | "v"; // horizontal or vertical
+}
+
+/** A user-drawn dewarp guide: cubic Bézier with endpoints freely placed inside the quad.
+ *  The system extrapolates to quad L/R edges for piecewise Coons patch boundaries. */
+export interface DewarpGuide {
+  p0: [number, number];    // left endpoint (mask space)
+  p3: [number, number];    // right endpoint (mask space)
+  cp1: [number, number];   // Bezier control point 1 (mask space)
+  cp2: [number, number];   // Bezier control point 2 (mask space)
+}
+
+/** A user-drawn align guide: straight line that should become perfectly vertical in the output.
+ *  The system extrapolates to quad T/B edges for column boundaries in the 2D Coons patch grid. */
+export interface AlignGuide {
+  p0: [number, number];    // top endpoint (mask space)
+  p1: [number, number];    // bottom endpoint (mask space)
+}
+
 // --- Editor State ---
 
 export interface EditState {
@@ -59,19 +82,14 @@ export interface EditState {
   rotation: 0 | 90 | 180 | 270;
   filterConfig: FilterConfig;
   eraseMask: EraseMask | null;
-  guideLines: GuideLine[];
+  guideLines: GuideLine[];        // reference lines (original)
+  dewarpGuides: DewarpGuide[];    // staff line dewarping curves
+  alignGuides: AlignGuide[];      // vertical alignment lines
 }
 
 export interface ImageHistory {
   past: EditState[];
   future: EditState[];
-}
-
-// --- Guide Lines ---
-
-export interface GuideLine {
-  pos: number;    // 0-1 percentage
-  axis: "h" | "v"; // horizontal or vertical
 }
 
 // --- Image Entry ---
@@ -112,8 +130,8 @@ export interface AppState {
 // --- Selection ---
 
 export interface PointSelection {
-  type: "corner" | "cp1" | "cp2" | "edge";
-  edgeIdx: number;
+  type: "corner" | "cp1" | "cp2" | "edge" | "guide-left" | "guide-right" | "guide-cp1" | "guide-cp2" | "guide-body" | "align-top" | "align-bottom" | "align-body";
+  edgeIdx: number;  // for quad points: edge index; for guide/align points: guide index
 }
 
 // --- Constants ---

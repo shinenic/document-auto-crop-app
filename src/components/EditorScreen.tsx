@@ -9,9 +9,9 @@ import CropPreview from "./CropPreview";
 import ToolPanel from "./ToolPanel";
 import GridOverlay, { DEFAULT_GRID_CONFIG, type GridConfig } from "./GridOverlay";
 import { useApp } from "../context/AppContext";
-import { perspectiveCrop } from "../lib/crop";
+import { perspectiveCrop, perspectiveCropPiecewise } from "../lib/crop";
 import { applyBinarize } from "../lib/binarize";
-import type { AppState } from "../lib/types";
+import type { AppState, DewarpGuide, AlignGuide } from "../lib/types";
 import { useKeyboardShortcuts } from "../hooks/useKeyboardShortcuts";
 
 function getSelectedImage(state: AppState) {
@@ -35,13 +35,27 @@ export default function EditorScreen() {
   const [brushSize, setBrushSize] = useState(50);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [previewBg, setPreviewBg] = useState<"checker" | "black" | "white" | "gray">("checker");
+  const [guideAddMode, setGuideAddMode] = useState(false);
+  const [guideAddStep, setGuideAddStep] = useState<"left" | "right" | null>(null);
+  const [pendingLeftV, setPendingLeftV] = useState<number | null>(null);
+  const [pendingP0, setPendingP0] = useState<[number, number] | null>(null);
   const [guidePlacementAxis, setGuidePlacementAxis] = useState<"h" | "v" | null>(null);
   const [gridConfig, setGridConfig] = useState<GridConfig>({ ...DEFAULT_GRID_CONFIG });
+  const [alignAddMode, setAlignAddMode] = useState(false);
+  const [alignAddStep, setAlignAddStep] = useState<"top" | "bottom" | null>(null);
+  const [pendingAlignP0, setPendingAlignP0] = useState<[number, number] | null>(null);
 
   // Exit eraser mode when switching images or leaving B&W filter
   const currentFilterType = getSelectedImage(state)?.editState?.filterConfig?.type;
   useEffect(() => {
     setEraserActive(false);
+    setGuideAddMode(false);
+    setGuideAddStep(null);
+    setPendingLeftV(null);
+    setPendingP0(null);
+    setAlignAddMode(false);
+    setAlignAddStep(null);
+    setPendingAlignP0(null);
   }, [state.selectedImageId, currentFilterType]);
 
   // Eraser hotkeys: E=toggle, B=brush, L=lasso, [/]=brush size
@@ -60,6 +74,8 @@ export default function EditorScreen() {
         return;
       }
       if (e.key === "Escape") {
+        if (alignAddMode) { setAlignAddMode(false); setAlignAddStep(null); setPendingAlignP0(null); return; }
+        if (guideAddMode) { setGuideAddMode(false); setGuideAddStep(null); setPendingLeftV(null); setPendingP0(null); return; }
         if (guidePlacementAxis) { setGuidePlacementAxis(null); return; }
         if (shortcutsOpen) { setShortcutsOpen(false); return; }
         if (eraserActive) { setEraserActive(false); return; }
@@ -75,7 +91,7 @@ export default function EditorScreen() {
         dispatch({ type: "TOGGLE_GUIDES" });
         return;
       }
-      if (state.showGuides && !eraserActive) {
+      if (stateRef.current.showGuides && !eraserActive) {
         if (e.key.toLowerCase() === "h") {
           e.preventDefault();
           setGuidePlacementAxis((v) => v === "h" ? null : "h");
@@ -86,6 +102,26 @@ export default function EditorScreen() {
           setGuidePlacementAxis((v) => v === "v" ? null : "v");
           return;
         }
+      }
+      if (e.key.toLowerCase() === "d" && !eraserActive && img?.editState) {
+        e.preventDefault();
+        setAlignAddMode(false); setAlignAddStep(null); setPendingAlignP0(null);
+        setGuideAddMode((v) => {
+          if (!v) { setGuideAddStep("left"); }
+          else { setGuideAddStep(null); setPendingLeftV(null); setPendingP0(null); }
+          return !v;
+        });
+        return;
+      }
+      if (e.key.toLowerCase() === "a" && !eraserActive && img?.editState) {
+        e.preventDefault();
+        setGuideAddMode(false); setGuideAddStep(null); setPendingLeftV(null); setPendingP0(null);
+        setAlignAddMode((v) => {
+          if (!v) { setAlignAddStep("top"); }
+          else { setAlignAddStep(null); setPendingAlignP0(null); }
+          return !v;
+        });
+        return;
       }
       if (e.key.toLowerCase() === "e" && isBW) {
         e.preventDefault();
@@ -117,7 +153,7 @@ export default function EditorScreen() {
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [eraserActive, shortcutsOpen, guidePlacementAxis, dispatch]);
+  }, [eraserActive, shortcutsOpen, guideAddMode, guidePlacementAxis, alignAddMode, dispatch]);
 
   const selectedImage = getSelectedImage(state);
 
@@ -141,6 +177,8 @@ export default function EditorScreen() {
     ? JSON.stringify({
         corners: selectedImage.editState.corners,
         edgeFits: selectedImage.editState.edgeFits,
+        dewarpGuides: selectedImage.editState.dewarpGuides,
+        alignGuides: selectedImage.editState.alignGuides,
       })
     : null;
 
@@ -159,12 +197,23 @@ export default function EditorScreen() {
       edgeFits: selectedImage.editState.edgeFits,
     };
 
-    const cropCanvas = perspectiveCrop(
-      selectedImage.originalCanvas,
-      quadResult,
-      selectedImage.maskWidth,
-      selectedImage.maskHeight,
-    );
+    const dg = selectedImage.editState.dewarpGuides;
+    const ag = selectedImage.editState.alignGuides;
+    const cropCanvas = (dg.length > 0 || ag.length > 0)
+      ? perspectiveCropPiecewise(
+          selectedImage.originalCanvas,
+          quadResult,
+          dg,
+          ag,
+          selectedImage.maskWidth,
+          selectedImage.maskHeight,
+        )
+      : perspectiveCrop(
+          selectedImage.originalCanvas,
+          quadResult,
+          selectedImage.maskWidth,
+          selectedImage.maskHeight,
+        );
 
     dispatch({
       type: "UPDATE_IMAGE",
@@ -289,17 +338,30 @@ export default function EditorScreen() {
       edgeFits: img.editState.edgeFits,
     };
 
-    const cropCanvas = perspectiveCrop(
-      img.originalCanvas,
-      quadResult,
-      img.maskWidth,
-      img.maskHeight,
-    );
+    const dg = img.editState.dewarpGuides;
+    const ag = img.editState.alignGuides;
+    const cropCanvas = (dg.length > 0 || ag.length > 0)
+      ? perspectiveCropPiecewise(
+          img.originalCanvas,
+          quadResult,
+          dg,
+          ag,
+          img.maskWidth,
+          img.maskHeight,
+        )
+      : perspectiveCrop(
+          img.originalCanvas,
+          quadResult,
+          img.maskWidth,
+          img.maskHeight,
+        );
 
     // Update prevCropKey so the useEffect doesn't double-compute
     prevCropKeyRef.current = JSON.stringify({
       corners: img.editState.corners,
       edgeFits: img.editState.edgeFits,
+      dewarpGuides: img.editState.dewarpGuides,
+      alignGuides: img.editState.alignGuides,
     });
 
     dispatch({
@@ -307,6 +369,78 @@ export default function EditorScreen() {
       id: img.id,
       updates: { cropCanvas },
     });
+  }, [dispatch]);
+
+  const handleGuideAddClick = useCallback((mx: number, my: number) => {
+    const img = getSelectedImage(stateRef.current);
+    if (!img?.editState) return;
+    const es = img.editState;
+
+    if (guideAddStep === null || guideAddStep === "left") {
+      // First click: place left endpoint (p0) at clicked position
+      setPendingLeftV(mx); // reuse state for storing p0.x temporarily
+      setPendingP0([mx, my]);
+      setGuideAddStep("right");
+    } else if (guideAddStep === "right" && pendingP0) {
+      // Second click: place right endpoint (p3) and create dewarp guide
+      const p0 = pendingP0;
+      const p3: [number, number] = [mx, my];
+
+      const newGuide: DewarpGuide = {
+        p0,
+        p3,
+        cp1: [p0[0] + (p3[0] - p0[0]) / 3, p0[1] + (p3[1] - p0[1]) / 3],
+        cp2: [p0[0] + 2 * (p3[0] - p0[0]) / 3, p0[1] + 2 * (p3[1] - p0[1]) / 3],
+      };
+
+      dispatch({ type: "PUSH_HISTORY", id: img.id });
+      const dewarpGuides = [...es.dewarpGuides, newGuide].sort(
+        (a, b) => (a.p0[1] + a.p3[1]) / 2 - (b.p0[1] + b.p3[1]) / 2,
+      );
+      dispatch({ type: "SET_EDIT_STATE", id: img.id, editState: { ...es, dewarpGuides } });
+
+      setGuideAddStep(null);
+      setPendingP0(null);
+      setPendingLeftV(null);
+      setGuideAddMode(false);
+    }
+  }, [guideAddStep, pendingP0, dispatch]);
+
+  const handleClearGuides = useCallback(() => {
+    const img = getSelectedImage(stateRef.current);
+    if (!img?.editState || img.editState.dewarpGuides.length === 0) return;
+    dispatch({ type: "PUSH_HISTORY", id: img.id });
+    dispatch({ type: "SET_EDIT_STATE", id: img.id, editState: { ...img.editState, dewarpGuides: [] } });
+  }, [dispatch]);
+
+  const handleAlignAddClick = useCallback((mx: number, my: number) => {
+    const img = getSelectedImage(stateRef.current);
+    if (!img?.editState) return;
+    const es = img.editState;
+
+    if (alignAddStep === null || alignAddStep === "top") {
+      setPendingAlignP0([mx, my]);
+      setAlignAddStep("bottom");
+    } else if (alignAddStep === "bottom" && pendingAlignP0) {
+      const p0 = pendingAlignP0;
+      const p1: [number, number] = [mx, my];
+      const newGuide: AlignGuide = { p0, p1 };
+      dispatch({ type: "PUSH_HISTORY", id: img.id });
+      const alignGuides = [...es.alignGuides, newGuide].sort(
+        (a, b) => (a.p0[0] + a.p1[0]) / 2 - (b.p0[0] + b.p1[0]) / 2,
+      );
+      dispatch({ type: "SET_EDIT_STATE", id: img.id, editState: { ...es, alignGuides } });
+      setAlignAddStep(null);
+      setPendingAlignP0(null);
+      setAlignAddMode(false);
+    }
+  }, [alignAddStep, pendingAlignP0, dispatch]);
+
+  const handleClearAlignGuides = useCallback(() => {
+    const img = getSelectedImage(stateRef.current);
+    if (!img?.editState || img.editState.alignGuides.length === 0) return;
+    dispatch({ type: "PUSH_HISTORY", id: img.id });
+    dispatch({ type: "SET_EDIT_STATE", id: img.id, editState: { ...img.editState, alignGuides: [] } });
   }, [dispatch]);
 
   const handleResizePointerDown = useCallback((e: React.PointerEvent) => {
@@ -392,6 +526,10 @@ export default function EditorScreen() {
             <QuadEditor
               onDragStart={handleDragStart}
               onDragEnd={handleDragEnd}
+              guideAddMode={guideAddMode || alignAddMode}
+              guideAddStep={guideAddMode ? guideAddStep : alignAddStep}
+              pendingLeftV={pendingLeftV}
+              onGuideAddClick={alignAddMode ? handleAlignAddClick : handleGuideAddClick}
             />
           </div>
           <div className="flex-1 flex flex-col min-w-0">
@@ -472,6 +610,21 @@ export default function EditorScreen() {
           onSetEraserTool={setEraserTool}
           brushSize={brushSize}
           onSetBrushSize={setBrushSize}
+          guideAddMode={guideAddMode}
+          onToggleGuideAdd={() => {
+            setGuideAddMode((v) => !v);
+            if (!guideAddMode) setGuideAddStep("left");
+            else { setGuideAddStep(null); setPendingLeftV(null); setPendingP0(null); }
+          }}
+          onClearGuides={handleClearGuides}
+          alignAddMode={alignAddMode}
+          onToggleAlignAdd={() => {
+            setGuideAddMode(false); setGuideAddStep(null); setPendingLeftV(null); setPendingP0(null);
+            setAlignAddMode((v) => !v);
+            if (!alignAddMode) setAlignAddStep("top");
+            else { setAlignAddStep(null); setPendingAlignP0(null); }
+          }}
+          onClearAlignGuides={handleClearAlignGuides}
         />
       </div>
       {sortModalOpen && (
@@ -492,6 +645,7 @@ export default function EditorScreen() {
               { group: "Editing", keys: [["Ctrl+Z", "Undo"], ["Ctrl+Shift+Z", "Redo"], ["R", "Rotate 90° CW"], ["Shift+R", "Rotate 90° CCW"]] },
               { group: "Eraser", keys: [["E", "Toggle eraser mode"], ["B", "Brush tool"], ["L", "Lasso tool"], ["[ / ]", "Brush size -/+"]] },
               { group: "Guides", keys: [["G", "Toggle guide lines"], ["H", "Place horizontal line"], ["V", "Place vertical line"], ["Right-click", "Remove line"], ["Shift+G", "Toggle grid overlay"]] },
+              { group: "Dewarp", keys: [["D", "Toggle dewarp guide add mode"], ["A", "Toggle align guide add mode"], ["Esc", "Cancel placement"], ["Delete / Backspace", "Remove selected guide"]] },
             ].map(({ group, keys }) => (
               <div key={group} className="mb-3 last:mb-0">
                 <h4 className="text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">{group}</h4>

@@ -58,7 +58,17 @@ function cloneEditState(s: EditState): EditState {
       binarize: { ...s.filterConfig.binarize },
     },
     eraseMask: s.eraseMask ? cloneEraseMask(s.eraseMask) : null,
-    guideLines: s.guideLines.map((g) => ({ ...g })),
+    guideLines: s.guideLines.map((g) => ({ pos: g.pos, axis: g.axis })),
+    dewarpGuides: s.dewarpGuides.map((g) => ({
+      p0: [...g.p0] as [number, number],
+      p3: [...g.p3] as [number, number],
+      cp1: [...g.cp1] as [number, number],
+      cp2: [...g.cp2] as [number, number],
+    })),
+    alignGuides: s.alignGuides.map((g) => ({
+      p0: [...g.p0] as [number, number],
+      p1: [...g.p1] as [number, number],
+    })),
   };
 }
 
@@ -77,6 +87,8 @@ export function editStateFromQuad(quad: QuadResult): EditState {
     },
     eraseMask: null,
     guideLines: [],
+    dewarpGuides: [],
+    alignGuides: [],
   };
 }
 
