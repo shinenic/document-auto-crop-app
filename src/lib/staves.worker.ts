@@ -7,6 +7,7 @@
  */
 
 declare const cv: any; // eslint-disable-line @typescript-eslint/no-explicit-any
+declare function importScripts(...urls: string[]): void;
 
 interface DetectRequest {
   id: number;
@@ -70,7 +71,7 @@ function detectStaves(
   height: number,
 ): Array<Array<{ x: number; y: number }>> {
   // Create OpenCV Mat from RGBA image data
-  const src = cv.matFromImageData(new ImageData(imageData, width, height));
+  const src = cv.matFromImageData({ data: imageData, width, height } as ImageData);
 
   // Convert to grayscale then binary (input is already binarized B&W,
   // but it's RGBA — convert to single-channel binary)
