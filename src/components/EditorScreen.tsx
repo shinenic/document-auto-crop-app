@@ -7,6 +7,7 @@ import SortModal from "./SortModal";
 import QuadEditor from "./QuadEditor";
 import CropPreview from "./CropPreview";
 import ToolPanel from "./ToolPanel";
+import GridOverlay, { DEFAULT_GRID_CONFIG, type GridConfig } from "./GridOverlay";
 import { useApp } from "../context/AppContext";
 import { perspectiveCrop } from "../lib/crop";
 import { applyBinarize } from "../lib/binarize";
@@ -35,6 +36,7 @@ export default function EditorScreen() {
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [previewBg, setPreviewBg] = useState<"checker" | "black" | "white" | "gray">("checker");
   const [guidePlacementAxis, setGuidePlacementAxis] = useState<"h" | "v" | null>(null);
+  const [gridConfig, setGridConfig] = useState<GridConfig>({ ...DEFAULT_GRID_CONFIG });
 
   // Exit eraser mode when switching images or leaving B&W filter
   const currentFilterType = getSelectedImage(state)?.editState?.filterConfig?.type;
@@ -63,7 +65,12 @@ export default function EditorScreen() {
         if (eraserActive) { setEraserActive(false); return; }
         return;
       }
-      if (e.key.toLowerCase() === "g" && !eraserActive) {
+      if (e.key === "G" && e.shiftKey && !eraserActive) {
+        e.preventDefault();
+        setGridConfig((prev) => ({ ...prev, enabled: !prev.enabled }));
+        return;
+      }
+      if (e.key.toLowerCase() === "g" && !e.shiftKey && !eraserActive) {
         e.preventDefault();
         dispatch({ type: "TOGGLE_GUIDES" });
         return;
@@ -361,6 +368,8 @@ export default function EditorScreen() {
           const newIdx = dir === "up" ? Math.max(0, idx - 1) : Math.min(state.images.length - 1, idx + 1);
           if (newIdx !== idx) dispatch({ type: "SELECT_IMAGE", id: state.images[newIdx].id });
         }}
+        gridConfig={gridConfig}
+        onGridConfigChange={(updates) => setGridConfig((prev) => ({ ...prev, ...updates }))}
       />
       <div className="flex-1 flex min-h-0">
         <div className="flex flex-col flex-shrink-0 relative border-r border-[var(--border)] bg-[var(--bg-secondary)]" style={{ width: sidebarWidth }}>
@@ -432,14 +441,28 @@ export default function EditorScreen() {
                 </div>
               )}
             </div>
-            <CropPreview
-              eraserActive={eraserActive}
-              eraserTool={eraserTool}
-              brushSize={brushSize}
-              previewBg={previewBg}
-              guidePlacementAxis={guidePlacementAxis}
-              onGuidePlaced={() => setGuidePlacementAxis(null)}
-            />
+            <div className="flex-1 flex flex-col min-h-0 relative">
+              <CropPreview
+                eraserActive={eraserActive}
+                eraserTool={eraserTool}
+                brushSize={brushSize}
+                previewBg={previewBg}
+                guidePlacementAxis={guidePlacementAxis}
+                onGuidePlaced={() => setGuidePlacementAxis(null)}
+              />
+              {gridConfig.enabled && (
+                <GridOverlay
+                  mode={gridConfig.mode}
+                  spacing={gridConfig.spacing}
+                  offset={gridConfig.offset}
+                  color={gridConfig.color}
+                  opacity={gridConfig.opacity}
+                  onOffsetChange={(offset) =>
+                    setGridConfig((prev) => ({ ...prev, offset }))
+                  }
+                />
+              )}
+            </div>
           </div>
         </div>
         <ToolPanel
@@ -468,7 +491,7 @@ export default function EditorScreen() {
               { group: "Navigation", keys: [["Arrow Up / Down", "Previous / Next image"]] },
               { group: "Editing", keys: [["Ctrl+Z", "Undo"], ["Ctrl+Shift+Z", "Redo"], ["R", "Rotate 90° CW"], ["Shift+R", "Rotate 90° CCW"]] },
               { group: "Eraser", keys: [["E", "Toggle eraser mode"], ["B", "Brush tool"], ["L", "Lasso tool"], ["[ / ]", "Brush size -/+"]] },
-              { group: "Guides", keys: [["G", "Toggle guide lines"], ["H", "Place horizontal line"], ["V", "Place vertical line"], ["Right-click", "Remove line"]] },
+              { group: "Guides", keys: [["G", "Toggle guide lines"], ["H", "Place horizontal line"], ["V", "Place vertical line"], ["Right-click", "Remove line"], ["Shift+G", "Toggle grid overlay"]] },
             ].map(({ group, keys }) => (
               <div key={group} className="mb-3 last:mb-0">
                 <h4 className="text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">{group}</h4>

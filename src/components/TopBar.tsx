@@ -10,6 +10,7 @@ import { exportPdf } from "../lib/pdfExport";
 import { applyEraseMask } from "../lib/eraser";
 import { PDF_PAGE_SIZES, detectBestPageSize, DEFAULT_BINARIZE_CONFIG } from "../lib/types";
 import type { PdfPageSize, FilterConfig, BinarizeConfig } from "../lib/types";
+import { GRID_COLORS, type GridConfig, type GridMode } from "./GridOverlay";
 
 // --- Helpers ---
 
@@ -33,7 +34,7 @@ function DropdownMenu({
   menuTrigger = false,
   minWidth = 220,
 }: {
-  label: string;
+  label: React.ReactNode;
   children: React.ReactNode;
   disabled?: boolean;
   accent?: boolean;
@@ -171,6 +172,8 @@ export default function TopBar({
   onCancelCrop,
   onToggleShortcuts,
   onNavigate,
+  gridConfig,
+  onGridConfigChange,
 }: {
   onManageImages?: () => void;
   previewBg?: PreviewBg;
@@ -183,6 +186,8 @@ export default function TopBar({
   onCancelCrop?: () => void;
   onToggleShortcuts?: () => void;
   onNavigate?: (dir: "up" | "down") => void;
+  gridConfig?: GridConfig;
+  onGridConfigChange?: (updates: Partial<GridConfig>) => void;
 }) {
   const { state, dispatch } = useApp();
   const draft = useDraft();
@@ -680,6 +685,123 @@ export default function TopBar({
           <span className={`inline-block w-1.5 h-1.5 rounded-full ${state.showGuides ? "bg-[var(--accent)]" : "bg-[var(--text-muted)]/30"}`} />
           Guide Lines
         </button>
+
+        {/* Grid Overlay */}
+        {onGridConfigChange && gridConfig && (
+          <DropdownMenu
+            label={
+              <>
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" className="shrink-0">
+                  <rect x="1" y="1" width="12" height="12" rx="1" />
+                  <line x1="5" y1="1" x2="5" y2="13" />
+                  <line x1="9" y1="1" x2="9" y2="13" />
+                  <line x1="1" y1="5" x2="13" y2="5" />
+                  <line x1="1" y1="9" x2="13" y2="9" />
+                </svg>
+                Grid
+              </>
+            }
+            accent={gridConfig.enabled}
+            minWidth={200}
+          >
+            {/* Toggle */}
+            <div className="px-3 py-2 flex items-center justify-between gap-4">
+              <span className="text-xs text-[var(--text-secondary)]">Show Grid</span>
+              <button
+                className={`relative inline-flex items-center shrink-0 w-8 h-[18px] rounded-full transition-colors ${
+                  gridConfig.enabled
+                    ? "bg-[var(--accent)]"
+                    : "bg-[var(--bg-primary)] border border-[var(--border)]"
+                }`}
+                onClick={() => onGridConfigChange({ enabled: !gridConfig.enabled })}
+              >
+                <span
+                  className={`inline-block w-3 h-3 rounded-full bg-white shadow-sm transition-all ${
+                    gridConfig.enabled ? "ml-[17px]" : "ml-[3px]"
+                  }`}
+                />
+              </button>
+            </div>
+            {gridConfig.enabled && (
+              <>
+                <MenuDivider />
+                <MenuLabel>Mode</MenuLabel>
+                <div className="px-3 py-1">
+                  <div className="flex rounded-md overflow-hidden border border-[var(--border)]">
+                    {([
+                      { value: "vertical" as GridMode, label: "Vertical" },
+                      { value: "horizontal" as GridMode, label: "Horizontal" },
+                      { value: "grid" as GridMode, label: "Grid" },
+                    ]).map((opt) => (
+                      <button
+                        key={opt.value}
+                        className={`flex-1 px-2 py-1.5 text-[11px] font-medium transition-colors ${
+                          gridConfig.mode === opt.value
+                            ? "bg-[var(--accent-muted)] text-[var(--accent)]"
+                            : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+                        }`}
+                        onClick={() => onGridConfigChange({ mode: opt.value })}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <MenuDivider />
+                <MenuLabel>Spacing</MenuLabel>
+                <div className="px-3 py-1 pb-2">
+                  <div className="flex justify-between text-[11px] mb-1">
+                    <span className="text-[var(--text-muted)]">Density</span>
+                    <span className="font-mono text-[var(--text-secondary)]">{gridConfig.spacing}px</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={10}
+                    max={200}
+                    step={5}
+                    value={gridConfig.spacing}
+                    className="w-full h-3"
+                    onChange={(e) => onGridConfigChange({ spacing: Number(e.target.value) })}
+                  />
+                </div>
+                <MenuDivider />
+                <MenuLabel>Color</MenuLabel>
+                <div className="px-3 py-1 flex flex-wrap gap-1.5">
+                  {GRID_COLORS.map((c) => (
+                    <button
+                      key={c.value}
+                      className={`w-5 h-5 rounded-full border transition-colors ${
+                        gridConfig.color === c.value
+                          ? "border-[var(--accent)] ring-1 ring-[var(--accent)]"
+                          : "border-[var(--border)] hover:border-[var(--border-hover)]"
+                      }`}
+                      style={{ backgroundColor: `rgb(${c.value})` }}
+                      title={c.label}
+                      onClick={() => onGridConfigChange({ color: c.value })}
+                    />
+                  ))}
+                </div>
+                <MenuDivider />
+                <MenuLabel>Opacity</MenuLabel>
+                <div className="px-3 py-1 pb-2">
+                  <div className="flex justify-between text-[11px] mb-1">
+                    <span className="text-[var(--text-muted)]">Transparency</span>
+                    <span className="font-mono text-[var(--text-secondary)]">{Math.round(gridConfig.opacity * 100)}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={5}
+                    max={100}
+                    step={5}
+                    value={Math.round(gridConfig.opacity * 100)}
+                    className="w-full h-3"
+                    onChange={(e) => onGridConfigChange({ opacity: Number(e.target.value) / 100 })}
+                  />
+                </div>
+              </>
+            )}
+          </DropdownMenu>
+        )}
 
         <div className="w-px h-5 bg-[var(--border)]" />
 
