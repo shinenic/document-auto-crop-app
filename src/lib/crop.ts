@@ -814,28 +814,42 @@ function computeCropDimensions(
   const h1 = [H[0], H[3], H[6]]; // x-basis (width direction)
   const h2 = [H[1], H[4], H[7]]; // y-basis (height direction)
 
+  // Affine ratio: √(||h1_xy||² / ||h2_xy||²) — the aspect ratio implied
+  // by the affine (non-projective) part of the homography.  This is always
+  // well-defined, accounts for rotation/shear, and doesn't depend on
+  // focal-length estimation.  It equals the true ratio when perspective is
+  // negligible and is a reasonable approximation otherwise.
+  const affNorm1 = h1[0] * h1[0] + h1[1] * h1[1];
+  const affNorm2 = h2[0] * h2[0] + h2[1] * h2[1];
+  const affineRatio = affNorm2 > 0 ? Math.sqrt(affNorm1 / affNorm2) : null;
+
   let ratio: number | null = null; // W / H
   const denom = h1[2] * h2[2];
   if (Math.abs(denom) > 1e-10) {
     const fSq = -(h1[0] * h2[0] + h1[1] * h2[1]) / denom;
-    if (fSq > 0) {
-      const norm1Sq =
-        (h1[0] * h1[0] + h1[1] * h1[1]) / fSq + h1[2] * h1[2];
-      const norm2Sq =
-        (h2[0] * h2[0] + h2[1] * h2[1]) / fSq + h2[2] * h2[2];
+    // Accept f² only when positive and plausible (f < 10× image diagonal).
+    // Beyond that the perspective signal is too weak for reliable estimation.
+    const maxDim = Math.max(imgW, imgH);
+    if (fSq > 0 && fSq < maxDim * maxDim * 100) {
+      const norm1Sq = affNorm1 / fSq + h1[2] * h1[2];
+      const norm2Sq = affNorm2 / fSq + h2[2] * h2[2];
       if (norm2Sq > 0) ratio = Math.sqrt(norm1Sq / norm2Sq);
     }
   }
 
-  // Fallback: average of opposite edge lengths
+  // Fallback chain: affine ratio > edge-length ratio
   if (ratio === null || !isFinite(ratio) || ratio <= 0) {
-    const d = (a: [number, number], b: [number, number]) =>
-      Math.hypot(b[0] - a[0], b[1] - a[1]);
-    const avgW =
-      (d(imgCorners[0], imgCorners[1]) + d(imgCorners[3], imgCorners[2])) / 2;
-    const avgH =
-      (d(imgCorners[0], imgCorners[3]) + d(imgCorners[1], imgCorners[2])) / 2;
-    ratio = avgW / avgH;
+    if (affineRatio !== null && isFinite(affineRatio) && affineRatio > 0) {
+      ratio = affineRatio;
+    } else {
+      const d = (a: [number, number], b: [number, number]) =>
+        Math.hypot(b[0] - a[0], b[1] - a[1]);
+      const avgW =
+        (d(imgCorners[0], imgCorners[1]) + d(imgCorners[3], imgCorners[2])) / 2;
+      const avgH =
+        (d(imgCorners[0], imgCorners[3]) + d(imgCorners[1], imgCorners[2])) / 2;
+      ratio = avgW / avgH;
+    }
   }
 
   // Quad area via shoelace formula
