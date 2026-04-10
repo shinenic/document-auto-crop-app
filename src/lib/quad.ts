@@ -556,10 +556,7 @@ export function findQuadrilateral(
   });
 
   function pairDecision(ratioA: number, ratioB: number): boolean {
-    const confA = Math.abs(ratioA - CURVE_THRESH);
-    const confB = Math.abs(ratioB - CURVE_THRESH);
-    const dominant = confA >= confB ? ratioA : ratioB;
-    return dominant > CURVE_THRESH;
+    return ratioA > CURVE_THRESH || ratioB > CURVE_THRESH;
   }
   const arc02 = pairDecision(curveRatios[0], curveRatios[2]);
   const arc13 = pairDecision(curveRatios[1], curveRatios[3]);
