@@ -44,8 +44,8 @@ function loadOpenCV(): Promise<void> {
         resolve();
       },
     };
-    // Use fetch+eval instead of importScripts (module workers don't support importScripts)
-    fetch("https://docs.opencv.org/4.9.0/opencv.js")
+    // Load from public/ directory (module workers don't support importScripts)
+    fetch("/opencv.js")
       .then((r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return r.text();
