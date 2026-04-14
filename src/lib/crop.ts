@@ -112,8 +112,9 @@ type BezierPts = [Pt, Pt, Pt, Pt];
 
 /** Find closest v-parameter on a Bezier edge to a given point. */
 function projectToEdge(
-  edgePts: BezierPts, target: Pt, samples = 80,
+  edgePts: BezierPts, target: Pt, samples = 400,
 ): number {
+  // Coarse search
   let bestV = 0, bestDist = Infinity;
   for (let i = 0; i <= samples; i++) {
     const v = i / samples;
@@ -121,7 +122,19 @@ function projectToEdge(
     const d = Math.hypot(pt[0] - target[0], pt[1] - target[1]);
     if (d < bestDist) { bestDist = d; bestV = v; }
   }
-  return Math.max(0.001, Math.min(0.999, bestV));
+  // Golden-section refinement in the neighborhood of bestV
+  const step = 1 / samples;
+  let lo = Math.max(0, bestV - step), hi = Math.min(1, bestV + step);
+  const phi = (Math.sqrt(5) - 1) / 2;
+  for (let iter = 0; iter < 30; iter++) {
+    const m1 = hi - phi * (hi - lo), m2 = lo + phi * (hi - lo);
+    const p1 = evalBezier(edgePts[0], edgePts[1], edgePts[2], edgePts[3], m1);
+    const p2 = evalBezier(edgePts[0], edgePts[1], edgePts[2], edgePts[3], m2);
+    const d1 = Math.hypot(p1[0] - target[0], p1[1] - target[1]);
+    const d2 = Math.hypot(p2[0] - target[0], p2[1] - target[1]);
+    if (d1 < d2) hi = m2; else lo = m1;
+  }
+  return Math.max(0.001, Math.min(0.999, (lo + hi) / 2));
 }
 
 /**
@@ -225,31 +238,7 @@ function extrapolateGuide(
   };
 }
 
-// ─── Arc-length interpolation on a precomputed table ───────────────────────
-
-function arcLengthAt(table: Float64Array, t: number): number {
-  const idx = t * (table.length - 1);
-  const lo = Math.floor(idx);
-  const hi = Math.min(lo + 1, table.length - 1);
-  if (lo === hi) return table[lo];
-  return table[lo] + (table[hi] - table[lo]) * (idx - lo);
-}
-
 // ─── Align guide extrapolation ─────────────────────────────────────────────
-
-/** Find u-parameter on a horizontal curve closest to a given point. */
-function projectToHCurve(
-  curveEval: (u: number) => Pt, target: Pt, samples = 80,
-): number {
-  let bestU = 0.5, bestDist = Infinity;
-  for (let i = 0; i <= samples; i++) {
-    const u = i / samples;
-    const pt = curveEval(u);
-    const d = Math.hypot(pt[0] - target[0], pt[1] - target[1]);
-    if (d < bestDist) { bestDist = d; bestU = u; }
-  }
-  return Math.max(0.001, Math.min(0.999, bestU));
-}
 
 /** Find u-parameter where a horizontal curve crosses a straight line (A→B). */
 function findLineCurveU(
@@ -398,15 +387,23 @@ export function perspectiveCropPiecewise(
   }
   if (outW < 2 || outH < 2) return null;
 
-  // ─── Row heights (arc-length along L/R edges) ─────────────────────────
-  const leftArcTable = buildArcLengthTable(Lraw[0], Lraw[1], Lraw[2], Lraw[3]);
-  const rightArcTable = buildArcLengthTable(Rraw[0], Rraw[1], Rraw[2], Rraw[3]);
+  // ─── Row heights (vertical distance between guide curves, multi-sample) ──
+  // Sample the vertical distance between consecutive h-boundaries at multiple
+  // u-positions across the width.  This is far more accurate than measuring
+  // only along the L/R edges, especially for curved guides.
+  const ROW_SAMPLES = 20;
   const numRows = hBounds.length - 1;
   const rowWeights: number[] = [];
   for (let i = 0; i < numRows; i++) {
-    const lLen = arcLengthAt(leftArcTable, hBounds[i + 1].leftV) - arcLengthAt(leftArcTable, hBounds[i].leftV);
-    const rLen = arcLengthAt(rightArcTable, hBounds[i + 1].rightV) - arcLengthAt(rightArcTable, hBounds[i].rightV);
-    rowWeights.push(Math.max((lLen + rLen) / 2, 0.001));
+    const topH = hBounds[i], botH = hBounds[i + 1];
+    let sumDist = 0;
+    for (let s = 0; s <= ROW_SAMPLES; s++) {
+      const u = s / ROW_SAMPLES;
+      const tp = topH.eval(u);
+      const bp = botH.eval(u);
+      sumDist += Math.hypot(bp[0] - tp[0], bp[1] - tp[1]);
+    }
+    rowWeights.push(Math.max(sumDist / (ROW_SAMPLES + 1), 0.001));
   }
   const totalRowWeight = rowWeights.reduce((a, b) => a + b, 0);
   const rowHeights: number[] = [];
