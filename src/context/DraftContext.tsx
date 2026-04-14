@@ -59,7 +59,7 @@ export function DraftProvider({ children }: { children: ReactNode }) {
   const isSavingRef = useRef(false);
   const changeCounter = useRef(0);
   const savedCounter = useRef(0);
-  const savedImageIdsRef = useRef<Set<string>>(new Set());
+  const savedImageIdsRef = useRef<string[]>([]);
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [isSupported, setIsSupported] = useState(false);
@@ -107,14 +107,19 @@ export function DraftProvider({ children }: { children: ReactNode }) {
     setIsSaving(true);
     try {
       const s = stateRef.current;
-      const dirtyIds = savedImageIdsRef.current.size === 0
+      const prevOrder = savedImageIdsRef.current;
+      const currentOrder = s.images.map(img => img.id);
+      // Full save if first save, or if image order/count changed (index-based filenames shift on deletion/reorder)
+      const orderChanged = prevOrder.length !== currentOrder.length ||
+        currentOrder.some((id, i) => prevOrder[i] !== id);
+      const dirtyIds = prevOrder.length === 0 || orderChanged
         ? null
-        : new Set(s.images.filter(img => !savedImageIdsRef.current.has(img.id)).map(img => img.id));
+        : new Set(s.images.filter(img => !prevOrder.includes(img.id)).map(img => img.id));
 
       await saveDraft(handle, s.images, s.showMask, dirtyIds, s.showGuides);
 
       savedCounter.current = changeCounter.current;
-      savedImageIdsRef.current = new Set(s.images.map(img => img.id));
+      savedImageIdsRef.current = s.images.map(img => img.id);
       setLastSavedAt(new Date().toISOString());
     } catch (e) {
       console.error("Draft save failed:", e);
@@ -170,7 +175,7 @@ export function DraftProvider({ children }: { children: ReactNode }) {
     }
     setDirHandle(handle);
     dirHandleRef.current = handle;
-    savedImageIdsRef.current = new Set();
+    savedImageIdsRef.current = [];
     await idbSet(IDB_HANDLE_KEY, handle);
     await doSave(handle);
   }, [isSupported, doSave]);
@@ -187,7 +192,7 @@ export function DraftProvider({ children }: { children: ReactNode }) {
       const data = await loadDraft(handle);
       setDirHandle(handle);
       dirHandleRef.current = handle;
-      savedImageIdsRef.current = new Set(data.images.map(img => img.id));
+      savedImageIdsRef.current = data.images.map(img => img.id);
       savedCounter.current = changeCounter.current;
       await idbSet(IDB_HANDLE_KEY, handle);
       setLastSavedAt(new Date().toISOString());
@@ -209,7 +214,7 @@ export function DraftProvider({ children }: { children: ReactNode }) {
       const data = await loadDraft(handle);
       setDirHandle(handle);
       dirHandleRef.current = handle;
-      savedImageIdsRef.current = new Set(data.images.map(img => img.id));
+      savedImageIdsRef.current = data.images.map(img => img.id);
       savedCounter.current = changeCounter.current;
       setLastSavedAt(new Date().toISOString());
       dispatch({ type: "LOAD_DRAFT", images: data.images, showMask: data.showMask, showGuides: data.showGuides });
